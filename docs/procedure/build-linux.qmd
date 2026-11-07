@@ -8,7 +8,7 @@
 
 | 用意するもの | 入手先 | 備考 |
 | --- | --- | --- |
-| cpp\_deps | 本書の管理者から受け取る | `cpp_deps-linux-amd64`。インストール不要。ライセンス文（`THIRD_PARTY_LICENSES.txt`）も一緒に置く |
+| cpp\_deps | 本書の管理者から受け取る | `cpp_deps-linux-amd64`。インストール不要。ツール自身のSBOM（`cpp_deps-linux-amd64.cdx.json`）とライセンス文（`THIRD_PARTY_LICENSES.txt`）も一緒に置く |
 | Syft | [GitHub: anchore/syft の Releases](https://github.com/anchore/syft/releases) | `linux_amd64.tar.gz` を選ぶ（`.deb` や `.rpm` は使わない）。インストール不要 |
 | bear | OSの標準パッケージ | Make でビルドしている場合のみ。CMake なら不要 |
 
@@ -35,7 +35,7 @@ dnf download --resolve --destdir os-pkg bear
 
 **(3) まとめて運ぶ**
 
-受け取った `cpp_deps-linux-amd64` と `THIRD_PARTY_LICENSES.txt`、取得した Syft の `.tar.gz`、`os-pkg` フォルダ（bear）を1つのフォルダにまとめ、社内規定に沿った方法（USBメモリ等）でビルドPCへ運びます。**このフォルダにはツールしか入っていないので、持ち込みで社内の情報が外に出ることはありません。**
+受け取った `cpp_deps-linux-amd64`、`cpp_deps-linux-amd64.cdx.json`、`THIRD_PARTY_LICENSES.txt`、取得した Syft の `.tar.gz`、`os-pkg` フォルダ（bear）を1つのフォルダにまとめ、社内規定に沿った方法（USBメモリ等）でビルドPCへ運びます。**このフォルダにはツールしか入っていないので、持ち込みで社内の情報が外に出ることはありません。**
 
 ## 1.3 ビルドPCへの持ち込み
 

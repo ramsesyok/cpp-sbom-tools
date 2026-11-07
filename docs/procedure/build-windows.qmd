@@ -10,7 +10,7 @@
 
 | 用意するもの | 入手先 | 備考 |
 | --- | --- | --- |
-| cpp\_deps | 本書の管理者から受け取る | `cpp_deps-windows-amd64.exe`。ライセンス文（`THIRD_PARTY_LICENSES.txt`）も一緒に置く |
+| cpp\_deps | 本書の管理者から受け取る | `cpp_deps-windows-amd64.exe`。ツール自身のSBOM（`cpp_deps-windows-amd64.cdx.json`）とライセンス文（`THIRD_PARTY_LICENSES.txt`）も一緒に置く |
 
 受け取ったファイルを、社内規定に沿った方法でビルドPCの `C:\sbom-tools` に置きます。
 
