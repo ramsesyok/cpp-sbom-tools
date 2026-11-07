@@ -46,10 +46,13 @@ scancode -clpi -n 4 `
 ビルドPCから運んだ実行ファイルを cve-bin-tool で直接調べ、中に埋め込まれている部品を確かめます。Linux 向けの実行ファイルや `.so` も、作業PC（Windows）のまま調べられます。結果は、第5章または第6章で `cpp_sbom check` が台帳と照らし合わせ、台帳の漏れを見つけます。**ここで調べるのは部品だけです。脆弱性は第7章で確認します。**
 
 ```powershell
-py -m cve_bin_tool.cli --offline `
+$env:PYTHONIOENCODING = 'utf-8'
+python -m cve_bin_tool.cli --offline `
   --sbom-output C:\sbom-work\cvebin-parts.json --sbom-type cyclonedx --sbom-format json `
   C:\sbom-work\delivery
 ```
+
+日本語Windowsで画面出力の文字コードエラーが出るのを防ぐため、`PYTHONIOENCODING` を指定します。
 
 データが取り込まれていないと、画面に「offline operation」を案内するメッセージが出て、結果ファイルは作られません。`cvebin-parts.json` ができていることを必ず確認してください。
 

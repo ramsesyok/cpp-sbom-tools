@@ -55,10 +55,10 @@ Invoke-WebRequest -Uri $url -OutFile ($info.path -replace ':', '_')
 **(5) cve-bin-tool と、その動作に必要なデータを取得する**
 
 ```powershell
-py -m pip download cve-bin-tool -d cve-bin-tool-pkg
-py -m pip install --user cve-bin-tool
-py -m cve_bin_tool.cli --update now -n json-nvd -d "OSV,GAD"
-py -m cve_bin_tool.cli --export cve-db.export
+python -m pip download cve-bin-tool -d cve-bin-tool-pkg
+python -m pip install --user cve-bin-tool
+python -m cve_bin_tool.cli --update now -n json-nvd -d "OSV,GAD"
+python -m cve_bin_tool.cli --export cve-db.export
 ```
 
 3行目はデータの取得で、10分ほどかかります。`-d "OSV,GAD"` は、エラーで止まるデータ取得元を外す指定です。途中の `Unable to fetch EPSS` というエラーと、最後の「対象フォルダが指定されていない」という趣旨のエラーは、想定どおりの動作です。
@@ -86,7 +86,7 @@ Expand-Archive grype.zip -DestinationPath C:\sbom-tools\grype -Force
 Expand-Archive scancode-toolkit-*windows*.zip -DestinationPath C:\sbom-tools -Force
 
 # cve-bin-tool
-py -m pip install --user --no-index --find-links cve-bin-tool-pkg cve-bin-tool
+python -m pip install --user --no-index --find-links cve-bin-tool-pkg cve-bin-tool
 ```
 
 **ツールの場所を登録する。** 毎回フォルダを指定しなくて済むよう、PowerShell を開くたびに次を実行します（ScanCode のフォルダ名は実際のものに置き換える）。
@@ -98,8 +98,11 @@ $env:Path = "C:\sbom-tools;C:\sbom-tools\grype;C:\sbom-tools\scancode-toolkit-<�
 **ScanCode の初回設定。** 初めての実行時に自動で設定が行われます。数分かかることがあります。ヘルプが表示されれば完了です。
 
 ```powershell
+$env:PYTHON_EXECUTABLE = 'python'
 scancode --help
 ```
+
+Python の `py` ランチャーがないPCでも、PATH に登録した `python` を使って初回設定できます。
 
 **ネットにつながない設定にする。** Grype が起動時に更新を確認しに行かないよう、設定ファイルを作ります。
 
@@ -118,7 +121,7 @@ db:
 grype db import (Get-Item C:\sbom-tools\vulnerability-db_v6*.tar.zst).FullName
 grype db status
 New-Item -ItemType Directory -Force "$env:USERPROFILE\.cache\cve-bin-tool" | Out-Null
-py -m cve_bin_tool.cli --import C:\sbom-tools\cve-db.export
+python -m cve_bin_tool.cli --import C:\sbom-tools\cve-db.export
 ```
 
 1行目は数分かかります。`grype db status` で `Status: valid` と、取得した日付（Built）が表示されれば成功です。最後の行では、最後に「対象フォルダが指定されていない」という趣旨のエラーが出ますが、これは想定どおりの動作です。
@@ -128,7 +131,7 @@ py -m cve_bin_tool.cli --import C:\sbom-tools\cve-db.export
 ```powershell
 grype version
 cyclonedx --version
-py -m cve_bin_tool.cli --version
+python -m cve_bin_tool.cli --version
 ```
 
 ## チェックリスト

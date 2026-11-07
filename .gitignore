@@ -12,6 +12,7 @@ build_link.log
 # ローカル環境
 pip/
 .vscode/
+.verification/
 
 # 検証データ（取得した PC のパスが入るので公開しない。go test はないときは飛ばす）
 /testdata/
