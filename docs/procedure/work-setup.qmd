@@ -12,7 +12,7 @@
 | Grype | [GitHub: anchore/grype の Releases](https://github.com/anchore/grype/releases) | `windows_amd64.zip` を選ぶ。**0.121.2 以上を使う**（古い版は Windows で脆弱性データベースの取り込みに失敗することがある） |
 | Grype用 脆弱性データベース | grype.anchore.io（手順3.2で取得） | 毎日更新される。定期的に取り直す（第8章） |
 | cve-bin-tool | PyPI（pip） | Python 3 が必要。作業4で、実行ファイルの中の部品を調べるのに使う |
-| cpp\_sbom | 本書の管理者から受け取る | `cpp_sbom-windows-amd64.exe` と `windows-system-inventory.ps1`。第5章または第6章で使う |
+| cpp\_sbom / cpp\_deps | 本書の管理者から受け取る | `cpp_sbom-windows-amd64.exe` と `cpp_deps-windows-amd64.exe`。第5章または第6章で使う |
 | Excel | 社内の標準 | 台帳の記入に使う |
 
 本書作成時点（2026年11月）の版は ScanCode 32.5.0、Grype 0.121.2、CycloneDX CLI 0.30.0 です。より新しい版があればそちらを使ってください。
@@ -67,7 +67,7 @@ cve-bin-tool 3.4 は、現在の NVD（米国の脆弱性データベース）�
 
 **(6) 受け取った実行ファイルを置く**
 
-本書の管理者から受け取った `cpp_sbom-windows-amd64.exe`、`windows-system-inventory.ps1`、ライセンス文（`THIRD_PARTY_LICENSES.txt`）を `C:\sbom-tools` に置きます。Windowsシステム製品では、このスクリプトを完成した納入構成にコピーして実行します。
+本書の管理者から受け取った `cpp_sbom-windows-amd64.exe`、`cpp_deps-windows-amd64.exe`、ライセンス文（`THIRD_PARTY_LICENSES.txt`）を `C:\sbom-tools` に置きます。Windowsシステム製品では、`cpp_deps-windows-amd64.exe` を完成した納入構成にコピーして実行します。
 
 最後に `C:\sbom-tools` フォルダごと、社内規定に沿った方法で作業PCへ運びます。**このフォルダにはツールと公開データしか入っていないので、持ち込みで社内の情報が外に出ることはありません。**
 

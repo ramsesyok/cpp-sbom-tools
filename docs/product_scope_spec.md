@@ -11,7 +11,7 @@
 
 `cpp_sbom ledger` は `deps.json` のOSパッケージを納入物のファイル名と突き合わせる。これは版やファイル内容の一致までは証明しない。静的ライブラリの所属パッケージは「同梱」候補、ヘッダだけのパッケージは人の確認行とする。納入物にない動的ライブラリとビルド用MSVC/Windows SDKは製品台帳に入れない。元の検出記録は「調査結果」に残す。納入物内のDLLは、PEのimport表に現れないものも候補にする。
 
-システム製品の `--system-inventory` はCycloneDX JSON。Linuxのdpkg/rpmパッケージはPURLの `distro=` から納入OSを導く。Windowsは配布スクリプトがOSと機器全体の登録アプリを記録し、更新プログラムは `Get-HotFix` が見える範囲をCSVに分ける。アプリのPublisherは参考列に残す。OSが不明な入力、複数のLinuxディストリビューションが混在する入力は拒否する。台帳に納入OSがちょうど1行必要。
+システム製品の `--system-inventory` はCycloneDX JSON。Linuxのdpkg/rpmパッケージはPURLの `distro=` から納入OSを導く。Windowsは `cpp_deps inventory` がOSと機器全体の登録アプリを記録し、更新プログラムは `Win32_QuickFixEngineering` が見える範囲をCSVに分ける。アプリのPublisherは参考列に残す。OSが不明な入力、複数のLinuxディストリビューションが混在する入力は拒否する。台帳に納入OSがちょうど1行必要。
 
 OSパッケージのライセンスは、調査結果にない場合は空欄を許す。導入済みソフトの版とCPE/PURLは必須で、CPEが見つからない場合は「なし」と明記する。これでも脆弱性の網羅を保証しない。WindowsのOS更新、ユーザー別アプリ、ポータブルアプリ、ドライバ・ファームウェアは別の納入構成記録とベンダーの修正情報で確認する。
 

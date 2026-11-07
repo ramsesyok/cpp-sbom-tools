@@ -9,7 +9,7 @@
 
 本書の手順では作業PCを Windows としていますが、配布物には Linux 版の `cpp_sbom-linux-amd64` も含まれています。どちらのツールにも、aarch64 の Linux 向け（`-linux-arm64`）があります。
 
-システム製品がWindowsの場合は、配布物の `windows-system-inventory.ps1` を完成した納入構成で実行します。PowerShell標準機能だけを使い、インストールや外部通信はしません。
+システム製品がWindowsの場合は、配布物の `cpp_deps-windows-amd64.exe inventory` を完成した納入構成で実行します。Windowsの管理情報とレジストリを読み取り、インストール、外部通信、子プロセスの起動はしません。
 
 ## cpp\_deps がしていること
 

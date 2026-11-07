@@ -2,9 +2,14 @@ module cpp_deps
 
 go 1.26.0
 
-require github.com/xuri/excelize/v2 v2.11.1
+require (
+	github.com/xuri/excelize/v2 v2.11.1
+	github.com/yusufpapurcu/wmi v1.2.4
+	golang.org/x/sys v0.49.0
+)
 
 require (
+	github.com/go-ole/go-ole v1.2.6 // indirect
 	github.com/richardlehane/mscfb v1.0.9 // indirect
 	github.com/richardlehane/msoleps v1.0.6 // indirect
 	github.com/tiendc/go-deepcopy v1.7.2 // indirect

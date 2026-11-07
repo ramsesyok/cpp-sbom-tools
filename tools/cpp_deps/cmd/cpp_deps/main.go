@@ -6,8 +6,12 @@ import (
 	"os"
 
 	"cpp_deps/internal/collect"
+	"cpp_deps/internal/inventory"
 )
 
 func main() {
+	if len(os.Args) > 1 && os.Args[1] == "inventory" {
+		os.Exit(inventory.Run(os.Args[2:]))
+	}
 	os.Exit(collect.Run(os.Args[1:]))
 }

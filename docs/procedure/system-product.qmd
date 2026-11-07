@@ -21,14 +21,13 @@ SYFT_CHECK_FOR_APP_UPDATE=false SYFT_FILE_METADATA_SELECTION=none \
 
 この結果はOSパッケージの台帳です。`/opt` やユーザー別の場所にパッケージ管理外で導入したソフトウェアがあれば、開発・構築担当者から納入構成の一覧を受け取り、後で台帳に行を追加してください。
 
-**Windowsの納入構成**：配布物の `windows-system-inventory.ps1` を納入機器へ置き、PowerShellで実行します。Windows標準の機能で、OSの版、機器全体にインストールされたアプリの登録情報、更新プログラムを記録します。
+**Windowsの納入構成**：配布物の `cpp_deps-windows-amd64.exe` を納入機器へ置き、PowerShellで実行します。ツールはWindows標準の管理情報とレジストリを直接読み、OSの版、機器全体にインストールされたアプリの登録情報、更新プログラムを記録します。外部通信や別のプログラムの起動はしません。
 
 ```powershell
-powershell -NoProfile -File C:\sbom-tools\windows-system-inventory.ps1 `
-  -OutputDirectory C:\sbom-work
+C:\sbom-tools\cpp_deps-windows-amd64.exe inventory --outdir C:\sbom-work
 ```
 
-`system-inventory.cdx.json` と `windows-updates.csv` を作業PCへ運びます。このスクリプトはユーザー別に導入されたアプリ、ポータブルアプリ、ドライバ・ファームウェアを網羅しません。納入構成の一覧と突き合わせ、抜けたソフトウェアは台帳に追加してください。`windows-updates.csv` は `Get-HotFix` で見える更新だけの記録です。更新履歴の全件とは限らないため、納入構成の更新管理記録と合わせて脆弱性を判断します。
+`system-inventory.cdx.json` と `windows-updates.csv` を作業PCへ運びます。この調査はユーザー別に導入されたアプリ、ポータブルアプリ、ドライバ・ファームウェアを網羅しません。納入構成の一覧と突き合わせ、抜けたソフトウェアは台帳に追加してください。`windows-updates.csv` は Windows の `Win32_QuickFixEngineering` で見える更新だけの記録です。更新履歴の全件とは限らないため、納入構成の更新管理記録と合わせて脆弱性を判断します。
 
 ## 6.2 部品台帳を作る
 

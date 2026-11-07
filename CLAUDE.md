@@ -33,7 +33,7 @@ claude.ai での検討（2026-10-31〜11-07）から Claude Code に引き継い
 - **Syft は作業2（ビルド環境の記録とライセンス取得）だけに使う。** OS 全体（検証環境で約1,000パッケージ）を製品 SBOM に入れるとノイズになるため。インストールせず、設定は環境変数で渡す（ビルドPCに何も残らないことをコンテナで確認）
 - **Grype は Windows では 0.121.2 以上。** 0.119.0 は `db import` が「being used by another process」で高い頻度で失敗する（Defender 有効の Windows 11 で 9 回中 8 回失敗。0.121.2 は 3 回とも成功）
 - **静的ライブラリはリンカのトレースで拾う**（Linux `-Wl,--trace`、Windows `/VERBOSE` の "Searching … / Found"）。ldd には静的リンクが出ないため
-- **自作ツールは Go の2つのバイナリ（実行時に何も要らない）。** `cpp_deps`（ビルドPC用。収集だけで、外部ライブラリなし）と `cpp_sbom`（作業PC用。`ledger`、`check`、`convert`。Windows 版が手順書の対象で、Linux 版も配布物に含める）。外部ライブラリは Excel 用の `excelize` のみで `cpp_sbom` だけが使う（Excel との互換性を自前で持たないため）。製品の台帳と SBOM には載らない。ビルドはネット接続PCで行い、配布物にライセンス文を添える。Windows 版も dumpbin を使わず PE を直接読む。英語の言語パックがない VS では `VSLANG=1033` が効かないので、リンカの日本語出力も読む
+- **自作ツールは Go の2つのバイナリ（実行時に別ファイルは不要）。** `cpp_deps` はビルド部品の収集に加え、Windows の納入構成を `inventory` で記録する。後者はWMIとレジストリをGoから直接読み、PowerShellや子プロセスを起動しない。`cpp_sbom` は作業PCで `ledger`、`check`、`convert` を実行する。外部ライブラリはExcel用の `excelize` とWindows情報取得用の `wmi`、`x/sys`（およびそれらの依存先）を使う。製品の台帳とSBOMには載らない。ビルドはネット接続PCで行い、配布物にライセンス文を添える。Windows 版も dumpbin を使わず PE を直接読む。英語の言語パックがない VS では `VSLANG=1033` が効かないので、リンカの日本語出力も読む
 - **台帳の全行を処理する方式。** 「やること」列の指示は数種類に固定。自社開発のもの（OSSを含まない）は区分を「対象外」にする。OSS を自社でビルドしたものは同梱扱い
 - **台帳に必須の項目が空の行が残っていると、SBOM へ変換しない**
 - **ScanCode のライセンス検出結果はそのまま使う**（例：nlohmann/json.hpp は Abseil 由来コードを含むため「MIT AND Apache-2.0」）

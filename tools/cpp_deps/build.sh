@@ -5,12 +5,12 @@ set -e
 cd "$(dirname "$0")"
 export CGO_ENABLED=0
 mkdir -p dist
+rm -f dist/windows-system-inventory.ps1
 for cmd in cpp_deps cpp_sbom; do
 	GOOS=linux   GOARCH=amd64 go build -trimpath -ldflags "-s -w" -o "dist/$cmd-linux-amd64" "./cmd/$cmd"
 	GOOS=linux   GOARCH=arm64 go build -trimpath -ldflags "-s -w" -o "dist/$cmd-linux-arm64" "./cmd/$cmd"
 	GOOS=windows GOARCH=amd64 go build -trimpath -ldflags "-s -w" -o "dist/$cmd-windows-amd64.exe" "./cmd/$cmd"
 done
-cp ../windows-system-inventory.ps1 dist/
 
 # バイナリに組み込まれるモジュールのライセンス文を集める（3つの OS 向けの和集合）
 notice=dist/THIRD_PARTY_LICENSES.txt

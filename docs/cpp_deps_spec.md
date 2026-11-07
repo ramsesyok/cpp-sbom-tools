@@ -6,6 +6,8 @@
 
 実装は `tools/cpp_deps/`（Go）。`sh build.sh` で `dist/` に次のバイナリができる。Windows 向けにビルドすると Windows 版、それ以外では Linux 版の動きをする。
 
+Windows 版の `cpp_deps inventory --outdir <保存先>` は、納入構成のOS・機器全体の登録アプリ・更新プログラムを読み取り、`system-inventory.cdx.json` と `windows-updates.csv` を作る。PowerShell、子プロセス、外部通信は使わない。OSと更新プログラムはWMI、アプリはHKLMの32/64ビットのUninstallキーから取得する。更新プログラムの範囲は `Win32_QuickFixEngineering` に限る。
+
 | ファイル | 対象 |
 | --- | --- |
 | `cpp_deps-linux-amd64` | Linux x86_64 |
