@@ -1,0 +1,28 @@
+# 付録B CPEの調べ方
+
+脆弱性データベースは、部品を CPE という決まった名前で探します。台帳の「CPEベンダー」「CPE製品名」がこの名前と一致しないと、脆弱性があっても見つかりません。作業PCに取り込み済みの Grype のデータベースで、ネットにつながずに調べられます。
+
+```powershell
+grype db search --pkg <部品名>
+```
+
+例えば `grype db search --pkg libpng` と入力すると、結果の中に `cpe:2.3:a:libpng:libpng:…` のような文字列が表示されます。`cpe:2.3:a:` の次がベンダー、その次が製品名です。部品名で何も出ない場合は、別の書き方（例：`libxml` と `libxml2`、`expat` と `libexpat`）でも試します。
+
+よく使われる部品の例を示します。必ず上のコマンドで最新の表記を確認してください。
+
+| 部品 | CPEベンダー | CPE製品名 |
+| --- | --- | --- |
+| zlib | zlib | zlib |
+| OpenSSL | openssl | openssl |
+| libpng | libpng | libpng |
+| libxml2 | xmlsoft | libxml2 |
+| Expat | libexpat\_project | libexpat |
+| curl / libcurl | haxx | curl（libcurl の場合は libcurl も確認） |
+| SQLite | sqlite | sqlite |
+| FreeType | freetype | freetype |
+
+どうしても見つからない部品は、データベースにまだ脆弱性が登録されていない可能性があります。その場合はCPEベンダー欄に「なし」と書き、備考欄に「CPE該当なし（確認日）」と書いておきます。
+
+**記号を含むCPE。** CPEには `paho_mqtt_c\/c\+\+_client`（Eclipse Paho のC/C++クライアント）のように `\` 付きの記号を含むものがあります。台帳には `\` を取り除いた形（`paho_mqtt_c/c++_client`）で書いてください。`cpp_sbom convert` が自動で `\` を付け直します。
+
+**データベース以外での調べ方。** ネット接続PCで、NVDの [CPE検索ページ](https://nvd.nist.gov/products/cpe/search) に部品名を入力して調べることもできます。入力するのは公開されているOSSの名前だけなので、社内の情報は外に出ません。

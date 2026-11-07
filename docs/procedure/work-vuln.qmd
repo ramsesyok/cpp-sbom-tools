@@ -1,0 +1,28 @@
+# 5. 脆弱性チェック
+
+「4. SBOM作成」で作ったSBOMを使って、作業PCで作業6を行います。**製品が Linux 向けでも Windows 向けでも、手順は同じです。** リリース後も、脆弱性データベースを更新して定期的にこの章の作業をやり直します。
+
+## 5.1 作業6 脆弱性を照合する
+
+```powershell
+cd C:\sbom-work
+grype sbom:product.cdx.json -o table --file grype-result.txt
+grype sbom:product.cdx.json -o json --file grype-result.json
+```
+
+`grype-result.txt` に、見つかった脆弱性が表形式で書かれます。主な列の意味は次のとおりです。結果の判断のしかたは 第6章を見てください。
+
+| 列 | 意味 |
+| --- | --- |
+| NAME / INSTALLED | 部品名と、使っているバージョン |
+| FIXED IN | 修正済みのバージョン（空欄＝修正版がまだない） |
+| VULNERABILITY | 脆弱性の番号（CVE-…） |
+| SEVERITY | 深刻度（Critical ＞ High ＞ Medium ＞ Low） |
+
+**何も表示されないとき**は、「脆弱性がない」のか「照合できていない」のかを区別する必要があります。台帳の「別途導入」「同梱」の部品にCPEが書けているか、CPEの綴りがNVDの表記と一致しているかを確認してください（付録B）。
+
+## チェックリスト
+
+- [ ] 作業6：`grype-result.txt` を作成し、第6章の手順で判断した
+
+結果の判断のしかた、誤検知の除外、リリースごとに保管するものは、第6章を見てください。

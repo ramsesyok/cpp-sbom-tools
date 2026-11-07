@@ -1,0 +1,139 @@
+# 3. 作業PCの準備
+
+台帳とSBOMの作成、脆弱性の確認は、インターネットにつながっていないWindows PC（以下「作業PC」。Windows 10 / 11）で行います。**製品が Linux 向けでも Windows 向けでも、作業PCでの手順は同じです。** コマンドは **PowerShell** に入力します。ツールの準備は最初に一度だけ行います。脆弱性データベースの定期的な更新は、第6章を見てください。
+
+## 3.1 用意するもの
+
+| 用意するもの | 入手先 | 備考 |
+| --- | --- | --- |
+| Python 3 | [python.org](https://www.python.org/downloads/windows/) | ScanCode と cve-bin-tool に必要。インストール時に「Add python.exe to PATH」にチェック |
+| ScanCode Toolkit | [GitHub: aboutcode-org/scancode-toolkit の Releases](https://github.com/aboutcode-org/scancode-toolkit/releases) | `windows` と、Python の版（例：`py3.12`）が書かれた `.zip` を選ぶ |
+| CycloneDX CLI | [GitHub: CycloneDX/cyclonedx-cli の Releases](https://github.com/CycloneDX/cyclonedx-cli/releases) | `cyclonedx-win-x64.exe` を選ぶ |
+| Grype | [GitHub: anchore/grype の Releases](https://github.com/anchore/grype/releases) | `windows_amd64.zip` を選ぶ。**0.121.2 以上を使う**（古い版は Windows で脆弱性データベースの取り込みに失敗することがある） |
+| Grype用 脆弱性データベース | grype.anchore.io（手順3.2で取得） | 毎日更新される。定期的に取り直す（第6章） |
+| cve-bin-tool | PyPI（pip） | Python 3 が必要。作業4で、実行ファイルの中の部品を調べるのに使う |
+| cpp\_sbom | 本書の管理者から受け取る | `cpp_sbom-windows-amd64.exe`。作業5で使う |
+| Excel | 社内の標準 | 台帳の記入に使う |
+
+本書作成時点（2026年11月）の版は ScanCode 32.5.0、Grype 0.121.2、CycloneDX CLI 0.30.0 です。より新しい版があればそちらを使ってください。
+
+## 3.2 ネット接続PCでのダウンロード
+
+ネット接続PCの PowerShell で実行します。Python は**作業PCと同じ版**をインストールしておいてください（cve-bin-tool の部品がPythonの版に依存するため）。
+
+**(1) 置き場所を作り、版を指定する**
+
+```powershell
+New-Item -ItemType Directory -Force C:\sbom-tools | Out-Null
+cd C:\sbom-tools
+$GRYPE_V = "0.121.2"
+$CDX_V = "0.30.0"
+```
+
+**(2) Grype と CycloneDX CLI を取得する**
+
+```powershell
+Invoke-WebRequest -Uri "https://github.com/anchore/grype/releases/download/v$GRYPE_V/grype_${GRYPE_V}_windows_amd64.zip" -OutFile grype.zip
+Invoke-WebRequest -Uri "https://github.com/CycloneDX/cyclonedx-cli/releases/download/v$CDX_V/cyclonedx-win-x64.exe" -OutFile cyclonedx.exe
+```
+
+**(3) Grype の脆弱性データベースを取得する**
+
+```powershell
+$info = Invoke-RestMethod https://grype.anchore.io/databases/v6/latest.json
+$url = "https://grype.anchore.io/databases/v6/" + $info.path
+$url
+Invoke-WebRequest -Uri $url -OutFile ($info.path -replace ':', '_')
+```
+
+3行目で `vulnerability-db_v6…tar.zst` で終わるURLが表示され、4行目でそのファイルが保存されます。ファイル名に Windows で使えない文字（`:`）が含まれるので、`_` に置き換えて保存します。
+
+**(4) ScanCode Toolkit と Python のインストーラを取得する**
+
+ブラウザで ScanCode の Releases ページを開き、最新版の **`windows` と Python の版を含む `.zip`** を `C:\sbom-tools` に保存します（作業PCの Python が 3.12 なら `py3.12-windows.zip`）。作業PCに Python がない場合は、python.org から同じ版のインストーラ（`python-3.x.x-amd64.exe`）も保存しておきます。
+
+**(5) cve-bin-tool と、その動作に必要なデータを取得する**
+
+```powershell
+py -m pip download cve-bin-tool -d cve-bin-tool-pkg
+py -m pip install --user cve-bin-tool
+py -m cve_bin_tool.cli --update now -n json-nvd -d "OSV,GAD"
+py -m cve_bin_tool.cli --export cve-db.export
+```
+
+3行目はデータの取得で、10分ほどかかります。`-d "OSV,GAD"` は、エラーで止まるデータ取得元を外す指定です。途中の `Unable to fetch EPSS` というエラーと、最後の「対象フォルダが指定されていない」という趣旨のエラーは、想定どおりの動作です。
+
+cve-bin-tool 3.4 は、現在の NVD（米国の脆弱性データベース）からデータを取得できません。**そのため本書では cve-bin-tool を部品の検出だけに使い、脆弱性の確認は作業6の Grype で行います。**
+
+**(6) 受け取った実行ファイルを置く**
+
+本書の管理者から受け取った `cpp_sbom-windows-amd64.exe` を `C:\sbom-tools` に置きます。一緒に受け取ったライセンス文（`THIRD_PARTY_LICENSES.txt`）も同じ場所に置きます。
+
+最後に `C:\sbom-tools` フォルダごと、社内規定に沿った方法で作業PCへ運びます。**このフォルダにはツールと公開データしか入っていないので、持ち込みで社内の情報が外に出ることはありません。**
+
+## 3.3 作業PCへのインストール
+
+運んだフォルダを作業PCの `C:\sbom-tools` に置き、PowerShell で実行します。ScanCode は長いパスの中に置くと初回設定に失敗するので、**必ず `C:\sbom-tools` の直下に展開してください。**
+
+```powershell
+cd C:\sbom-tools
+New-Item -ItemType Directory -Force C:\sbom-work | Out-Null
+
+# Grype
+Expand-Archive grype.zip -DestinationPath C:\sbom-tools\grype -Force
+
+# ScanCode Toolkit（ファイル名は実際のものに置き換える）
+Expand-Archive scancode-toolkit-*windows*.zip -DestinationPath C:\sbom-tools -Force
+
+# cve-bin-tool
+py -m pip install --user --no-index --find-links cve-bin-tool-pkg cve-bin-tool
+```
+
+**ツールの場所を登録する。** 毎回フォルダを指定しなくて済むよう、PowerShell を開くたびに次を実行します（ScanCode のフォルダ名は実際のものに置き換える）。
+
+```powershell
+$env:Path = "C:\sbom-tools;C:\sbom-tools\grype;C:\sbom-tools\scancode-toolkit-<版>;" + $env:Path
+```
+
+**ScanCode の初回設定。** 初めての実行時に自動で設定が行われます。数分かかることがあります。ヘルプが表示されれば完了です。
+
+```powershell
+scancode --help
+```
+
+**ネットにつながない設定にする。** Grype が起動時に更新を確認しに行かないよう、設定ファイルを作ります。
+
+```powershell
+@"
+check-for-app-update: false
+db:
+  auto-update: false
+  validate-age: false
+"@ | Set-Content -Encoding ascii "$env:USERPROFILE\.grype.yaml"
+```
+
+**脆弱性データベースを取り込む。**
+
+```powershell
+grype db import (Get-Item C:\sbom-tools\vulnerability-db_v6*.tar.zst).FullName
+grype db status
+New-Item -ItemType Directory -Force "$env:USERPROFILE\.cache\cve-bin-tool" | Out-Null
+py -m cve_bin_tool.cli --import C:\sbom-tools\cve-db.export
+```
+
+1行目は数分かかります。`grype db status` で `Status: valid` と、取得した日付（Built）が表示されれば成功です。最後の行では、最後に「対象フォルダが指定されていない」という趣旨のエラーが出ますが、これは想定どおりの動作です。
+
+**動作確認。** 次の3つがそれぞれバージョンを表示すれば準備完了です。
+
+```powershell
+grype version
+cyclonedx --version
+py -m cve_bin_tool.cli --version
+```
+
+## チェックリスト
+
+- [ ] ツールを作業PCにインストールし、3つのツールのバージョン表示を確認した
+- [ ] 脆弱性データベース（Grype、cve-bin-tool）を取り込んだ
+
+準備が終わったら 4. SBOM作成 に進みます。

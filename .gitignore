@@ -1,0 +1,14 @@
+# ビルドした配布物（ネット接続PCで sh build.sh を実行して作る）
+tools/cpp_deps/dist/
+
+# 手順書の生成物（docs/procedure で quarto render を実行して作る）
+docs/procedure/_book/
+docs/procedure/.quarto/
+
+# サンプルのビルド結果
+samples/*/build/
+build_link.log
+
+# ローカル環境
+pip/
+.vscode/

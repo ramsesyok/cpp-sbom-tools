@@ -1,0 +1,7 @@
+cmake_minimum_required(VERSION 3.16)
+project(mqtt_sample CXX)
+set(CMAKE_CXX_STANDARD 17)
+find_package(PahoMqttCpp REQUIRED)
+add_executable(mqtt_sample src/main.cpp)
+target_include_directories(mqtt_sample PRIVATE third_party src)
+target_link_libraries(mqtt_sample PRIVATE PahoMqttCpp::paho-mqttpp3)

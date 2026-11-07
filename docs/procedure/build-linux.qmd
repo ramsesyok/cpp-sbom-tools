@@ -1,0 +1,155 @@
+# 1. ビルドPCの作業（Linux）
+
+対象プログラムをビルドするPC（Ubuntu / Debian 系、または Red Hat / Rocky / Alma 系。以下「ビルドPC」）で、作業1〜2を行います。コマンドは「ターミナル」に入力します。
+
+ビルドPCの環境をきれいに保つため、**インストールするのは bear だけ**です（CMake でビルドしている場合は bear も不要です）。cpp\_deps と Syft は、フォルダに置くだけで動きます。cpp\_deps が何をするツールかは、付録Cに書いています。
+
+## 1.1 用意するもの
+
+| 用意するもの | 入手先 | 備考 |
+| --- | --- | --- |
+| cpp\_deps | 本書の管理者から受け取る | `cpp_deps-linux-amd64`。インストール不要。ライセンス文（`THIRD_PARTY_LICENSES.txt`）も一緒に置く |
+| Syft | [GitHub: anchore/syft の Releases](https://github.com/anchore/syft/releases) | `linux_amd64.tar.gz` を選ぶ（`.deb` や `.rpm` は使わない）。インストール不要 |
+| bear | OSの標準パッケージ | Make でビルドしている場合のみ。CMake なら不要 |
+
+本書作成時点（2026年11月）の Syft の版は 1.38.0 です。より新しい版があればそちらを使ってください。
+
+## 1.2 ネット接続PCでのダウンロード
+
+**(1) Syft を取得する。** ネット接続PCは Windows でも Linux でも構いません。ブラウザで次のURLを開いて保存します。
+
+`https://github.com/anchore/syft/releases/download/v1.38.0/syft_1.38.0_linux_amd64.tar.gz`
+
+**(2) bear を取得する**（Make でビルドしている場合のみ）
+
+ビルドPCと**同じOS・同じバージョン**の Linux で実行します。
+
+```bash
+# Ubuntu / Debian 系
+mkdir -p os-pkg && cd os-pkg && apt-get download $(apt-cache depends --recurse --no-recommends --no-suggests --no-conflicts --no-breaks --no-replaces --no-enhances bear | grep '^\w' | sort -u) ; cd ..
+# Red Hat 系
+dnf download --resolve --destdir os-pkg bear
+```
+
+この方法は、ネット接続PCとビルドPCの**OSの版と更新状態が同じ**ことが前提です。インストール時に「ダウングレード」という表示が出た場合は、作業を中止して開発担当者に相談してください。
+
+**(3) まとめて運ぶ**
+
+受け取った `cpp_deps-linux-amd64` と `THIRD_PARTY_LICENSES.txt`、取得した Syft の `.tar.gz`、`os-pkg` フォルダ（bear）を1つのフォルダにまとめ、社内規定に沿った方法（USBメモリ等）でビルドPCへ運びます。**このフォルダにはツールしか入っていないので、持ち込みで社内の情報が外に出ることはありません。**
+
+## 1.3 ビルドPCへの持ち込み
+
+運んだファイルを `~/sbom-tools` に置いて、次を実行します。
+
+```bash
+mkdir -p ~/sbom-work
+cd ~/sbom-tools
+chmod +x cpp_deps-linux-amd64
+mkdir -p syft && tar xzf syft_*_linux_amd64.tar.gz -C syft
+
+# bear（Make の場合のみ）
+sudo apt install ./os-pkg/*.deb        # Red Hat 系は sudo dnf install ./os-pkg/*.rpm
+```
+
+動作確認として、次がバージョンを表示すれば準備完了です。
+
+```bash
+~/sbom-tools/syft/syft version
+```
+
+## 1.4 作業1 ビルドで使った部品を調べる
+
+プログラムを一度ビルドし直し、その途中で「コンパイルで読み込んだヘッダ」と「リンクで使ったライブラリ（静的ライブラリ `.a` を含む）」を記録します。そのあと `cpp_deps` で、各ファイルがどのOSパッケージのものかを調べ、結果を `deps.json` というファイルに書き出します。**ビルド手順そのものは開発チームの手順書に従ってください。** この作業だけ開発担当者に依頼しても構いません。
+
+**(1) 記録を取りながらビルドする**
+
+どちらの場合も、リンカに「使ったファイルを表示する」指定（`-Wl,--trace`）を加え、画面に出た内容を `build_link.log` に保存します。
+
+Make でビルドしている場合：
+
+```bash
+cd <プロジェクトのフォルダ>
+make clean
+bear -- make CC="gcc -Wl,--trace" CXX="g++ -Wl,--trace" 2>&1 | tee build_link.log
+```
+
+CMake でビルドしている場合（bear は不要）：
+
+```bash
+cd <プロジェクトのフォルダ>
+cmake -S . -B build -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+  -DCMAKE_EXE_LINKER_FLAGS="-Wl,--trace" -DCMAKE_SHARED_LINKER_FLAGS="-Wl,--trace"
+cmake --build build --clean-first 2>&1 | tee build_link.log
+```
+
+`compile_commands.json`（CMake の場合は `build` フォルダの中）と `build_link.log` の2つができれば成功です。`-Wl,--trace` は記録を出すだけの指定で、できあがるプログラムの中身は変わりません。
+
+**(2) cpp\_depsを実行する**
+
+```bash
+~/sbom-tools/cpp_deps-linux-amd64 \
+  --compdb compile_commands.json \
+  --linklog build_link.log \
+  --bin <実行ファイルや.soがあるフォルダ> \
+  --src . \
+  --out ~/sbom-work/deps.json
+```
+
+CMake でビルドしている場合は、`--compdb` を `build/compile_commands.json` にしてください。
+
+最後に「注意:」で始まるメッセージが出た場合は、表示された内容に従ってビルドからやり直してください。**この調査はビルドPCでしかできないので、持ち出す前に解決します。** 特に「ビルドログにリンクの記録がありません」と出た場合は、Makefile がコンパイラ名を直接書いているなどの理由で指定が効いていません。開発担当者に、リンク時に `-Wl,--trace` が付くよう調整を依頼してください。「場所を特定できないライブラリが○件あります」と出た場合は、ビルドをやり直さず、`--linkdir` に `build_link.log` に書かれた相対パスの基準フォルダを指定して、`cpp_deps` を再実行してください。リンクしたファイルをログから探し直します。再実行しても残ったものは、そのまま持ち出して構いません（台帳の行として残ります）。
+
+**(3) 結果を確かめる**
+
+`~/sbom-work/deps.json` ができ、「注意:」が出ていなければ成功です。このファイルは作業5でツールが読むもので、人が開く必要はありません。部品の区分や確認は、すべて作業5の台帳で行います。
+
+**この方法でも見つけられないもの：** 他社や別部署からビルド済みの実行ファイル・DLLを受け取り、リンクせずにそのまま同梱している場合です。これは作業4（cve-bin-tool）で検出します。
+
+## 1.5 作業2 ビルド環境のOSパッケージを記録する
+
+ビルドPCにインストールされているOSパッケージをすべて記録します。これは製品のSBOMとは別の**「ビルド環境の記録」**として保管し、後で「どの環境でビルドしたか」を説明するときに使います。
+
+```bash
+cd ~
+SYFT_CHECK_FOR_APP_UPDATE=false SYFT_FILE_METADATA_SELECTION=none \
+~/sbom-tools/syft/syft scan dir:/ \
+  --override-default-catalogers "dpkg-db-cataloger,rpm-db-cataloger" \
+  --exclude './proc/**' --exclude './sys/**' --exclude './dev/**' \
+  --exclude './home/**' --exclude './tmp/**' \
+  -o cyclonedx-json=$HOME/sbom-work/build-env.cdx.json
+```
+
+- `SYFT_…` で始まる2つの指定は、更新の確認で外部に通信しないようにするなどの設定です。設定ファイルは作らないので、ビルドPCには何も残りません。
+- OS全体を対象にするため、プロジェクトのフォルダではなく `/`（OSのルート）を指定します。`/home` を除外しているのは、個人のファイルを記録に含めないためです。
+
+実行中に `WARN no explicit name and version provided for directory source` などの警告が表示されることがありますが、結果には影響しません。数秒から数分で終わります。この記録には各OSパッケージのライセンス（OSの copyright ファイルに書かれたもの）も入っており、作業5で台帳を作るときに使います。
+
+## 1.6 作業PCへ持ち出す
+
+これ以降の作業は、別のWindows PC（以下「作業PC」）で行います。次の3つを、社内規定に沿った方法で作業PCへ運びます。
+
+| 持ち出すもの | 作り方 | 使う作業 |
+| --- | --- | --- |
+| `deps.json` | 作業1でできたもの | 作業5 |
+| `build-env.cdx.json` | 作業2でできたもの | 作業5 |
+| `source.tar.gz` | 下のコマンドで作る。**ビルドした状態の**プロジェクトのフォルダ全体（ソースと成果物）をまとめたもの | 作業3、作業4、作業5 |
+
+```bash
+cd <プロジェクトのフォルダの1つ上のフォルダ>
+tar czhf ~/sbom-work/source.tar.gz --exclude=.git <プロジェクトのフォルダ名>
+```
+
+- `h` は、シンボリックリンク（別のファイルを指す印）を実体のファイルに置き換える指定です。Windows ではシンボリックリンクをうまく展開できないことがあるためです。リンク先のないシンボリックリンクがあると `File removed before we read it` と表示されますが、そのリンクが入らないだけで、ほかのファイルはまとめられています。
+- 実行ファイルや `.so` のフォルダがプロジェクトのフォルダの**外**にある場合は、そのフォルダも同じコマンドで別のファイル（例：`artifacts.tar.gz`）にまとめて運びます。
+- ソースはビルドしたものと同じ版にしてください。ビルド後に更新したソースを運ぶと、SBOMが実際の製品と合わなくなります。
+
+作業PCに運べたら、ビルドPCの `~/sbom-tools` と `~/sbom-work` は削除して構いません。これで cpp\_deps と Syft は完全に消えます。bear も不要なら削除できます。**ただし、リリースごとに作業1からやり直すので、残しておくと次回の準備が省けます。**
+
+## チェックリスト
+
+- [ ] 作業1：`-Wl,--trace` 付きでビルドし、cpp\_deps 実行時に「注意:」が出ないことを確認した
+- [ ] 作業1：`deps.json` を作成した
+- [ ] 作業2：`build-env.cdx.json` を作成した
+- [ ] `deps.json`、`build-env.cdx.json`、`source.tar.gz` を作業PCへ運んだ
+
+次は 3. 作業PCの準備 に進みます（準備済みなら 4. SBOM作成）。

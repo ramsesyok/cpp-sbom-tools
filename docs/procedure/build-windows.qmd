@@ -1,0 +1,130 @@
+# 2. ビルドPCの作業（Windows）
+
+対象プログラムをビルドするPC（Windows 10 / 11、Visual Studio がインストール済み。以下「ビルドPC」）で、作業1〜2を行います。コマンドは **Developer PowerShell for VS** に入力します。
+
+**対象は、Visual Studio のコンパイラ（MSVC）でビルドするプログラムです。** ソリューションのほか、CMake や nmake を使っていても構いません。MinGW や clang でビルドするものは、この手順では調べられません。
+
+ビルドPCの環境をきれいに保つため、**持ち込むのは cpp\_deps だけ**です。インストールは不要で、フォルダに置くだけで動きます。何をするツールかは、付録Cに書いています。
+
+## 2.1 用意するもの
+
+| 用意するもの | 入手先 | 備考 |
+| --- | --- | --- |
+| cpp\_deps | 本書の管理者から受け取る | `cpp_deps-windows-amd64.exe`。ライセンス文（`THIRD_PARTY_LICENSES.txt`）も一緒に置く |
+
+受け取ったファイルを、社内規定に沿った方法でビルドPCの `C:\sbom-tools` に置きます。
+
+Windows には、Linux のような「OSパッケージの一覧」の仕組みがないので、Syft は使いません。部品の出どころは、作業1のツールが**「Microsoft製」「プロジェクト内」「それ以外」に自動で分類します**。
+
+## 2.2 作業1 ビルドで使った部品を調べる
+
+プログラムを一度ビルドし直し、その途中で「コンパイルで読み込んだヘッダ」と「リンクで使ったライブラリ（静的ライブラリ `.lib` を含む）」をログに記録します。そのあと `cpp_deps` で、成果物のEXE/DLLと合わせて調べ、結果を `deps.json` というファイルに書き出します。**ビルド手順そのものは開発チームの手順書に従ってください。** この作業だけ開発担当者に依頼しても構いません。
+
+**(1) 「Developer PowerShell for VS」を開く**
+
+スタートメニューで「Developer PowerShell」と入力し、使っている Visual Studio の版のものを開きます。この画面では `msbuild` が使えます。結果を置く作業用フォルダも、ここで作っておきます。
+
+```powershell
+New-Item -ItemType Directory -Force C:\sbom-work | Out-Null
+```
+
+**(2) 記録を取りながらビルドする**
+
+ビルドのしかたによってコマンドが違います。どれにあたるか分からないときは、開発担当者に確認してください。
+
+Visual Studio のソリューション（`.sln`）をビルドする場合：
+
+```powershell
+cd <プロジェクトのフォルダ>
+$env:VSLANG = "1033"
+$env:_CL_ = "/showIncludes"
+$env:_LINK_ = "/VERBOSE"
+msbuild <ソリューション名>.sln /t:Rebuild /m:1 /p:Configuration=Release /p:Platform=x64 `
+  /fl "/flp:logfile=C:\sbom-work\build.log;verbosity=normal"
+Remove-Item Env:VSLANG, Env:_CL_, Env:_LINK_
+```
+
+CMake でビルドする場合（ビルド用のフォルダがすでに作られていること）：
+
+```powershell
+cd <プロジェクトのフォルダ>
+$env:VSLANG = "1033"
+$env:_CL_ = "/showIncludes"
+$env:_LINK_ = "/VERBOSE"
+cmake --build <ビルド用のフォルダ> --config Release --clean-first -- /m:1 `
+  /fl "/flp:logfile=C:\sbom-work\build.log;verbosity=normal"
+Remove-Item Env:VSLANG, Env:_CL_, Env:_LINK_
+```
+
+CMake は、ビルド用のフォルダに `.sln` か `.slnx` のファイルがある場合（Visual Studio 用の設定）だけ、この方法で記録できます。ない場合は記録が取れないことがあるので、Visual Studio 用の設定でビルド用のフォルダを作り直すよう、開発担当者に依頼してください。
+
+nmake（Makefile）でビルドする場合：
+
+```powershell
+cd <Makefileのあるフォルダ>
+$env:VSLANG = "1033"
+$env:_CL_ = "/showIncludes"
+$env:_LINK_ = "/VERBOSE"
+nmake /a 2>&1 | Out-File -Encoding utf8 C:\sbom-work\build.log
+Remove-Item Env:VSLANG, Env:_CL_, Env:_LINK_
+```
+
+- `VSLANG` は、コンパイラとリンカのメッセージを英語にする設定です。英語の言語パックが入っていない Visual Studio では日本語のままですが、ツールはどちらの言語でも読み取れます。
+- `_CL_` は「読み込んだヘッダを表示する」、`_LINK_` は「使ったライブラリを表示する」設定です。最後の行で元に戻します。
+- `/m:1` は、1つずつ順番にビルドする指定です。並列にビルドするとログが混ざり、正しく読み取れないことがあるためです。
+- `Configuration`、`Platform`、`--config` は、実際に出荷する設定に合わせてください。
+- `nmake` の `/a` は、すべてをビルドし直す指定です。
+- いずれも記録を出すための設定で、できあがるプログラムの中身は変わりません。ログは数十MBと大きくなることがあります。
+
+**(3) cpp\_depsを実行する**
+
+同じ Developer PowerShell の画面で実行します。
+
+```powershell
+C:\sbom-tools\cpp_deps-windows-amd64.exe `
+  --bin <EXEやDLLが出力されたフォルダ> `
+  --src <プロジェクトのフォルダ> `
+  --buildlog C:\sbom-work\build.log `
+  --out C:\sbom-work\deps.json
+```
+
+最後に「注意:」で始まるメッセージが出た場合は、表示された内容に従って (2) からやり直してください。**この調査はビルドPCでしかできないので、持ち出す前に解決します。** 「MSVC 以外のコンパイラ」と表示された場合は、やり直しても解決しません。この手順の対象外なので、本書の管理者に相談してください。
+
+**(4) 結果を確かめる**
+
+`C:\sbom-work\deps.json` ができ、「注意:」が出ていなければ成功です。このファイルは作業5でツールが読むもので、人が開く必要はありません。部品の区分や確認は、すべて作業5の台帳で行います。
+
+## 2.3 作業2 部品の出どころ（自動で分類されます）
+
+作業1の `cpp_deps` が、部品を出どころごとに自動で分類しています。**ここで人がする作業はありません。** 分類の結果は作業5の台帳に入り、確認と記入は台帳で行います。
+
+Microsoft製の部品（Visual Studio のランタイム、MFC、Windows SDK など）は、1つずつは台帳に出ません。台帳には「MSVC」「Windows SDK」の2行だけが自動で入り、脆弱性は Windows Update と Visual Studio の更新で管理します。
+
+**この方法でも見つけられないもの：** 他社や別部署からビルド済みの実行ファイル・DLLを受け取り、リンクも読み込みもせずに同梱している場合です。これは作業4（cve-bin-tool）で検出します。
+
+## 2.4 作業PCへ持ち出す
+
+これ以降の作業は、別のWindows PC（以下「作業PC」）で行います。次の2つを、社内規定に沿った方法で作業PCへ運びます。
+
+| 持ち出すもの | 作り方 | 使う作業 |
+| --- | --- | --- |
+| `deps.json` | 作業1でできたもの | 作業5 |
+| `source.tar.gz` | 下のコマンドで作る。**ビルドした状態の**プロジェクトのフォルダ全体（ソースと成果物）をまとめたもの | 作業3、作業4、作業5 |
+
+```powershell
+cd <プロジェクトのフォルダの1つ上のフォルダ>
+tar czf C:\sbom-work\source.tar.gz --exclude=.git --exclude=.vs <プロジェクトのフォルダ名>
+```
+
+- EXEやDLLのフォルダがプロジェクトのフォルダの**外**にある場合は、そのフォルダも同じコマンドで別のファイル（例：`artifacts.tar.gz`）にまとめて運びます。
+- ソースはビルドしたものと同じ版にしてください。ビルド後に更新したソースを運ぶと、SBOMが実際の製品と合わなくなります。
+
+作業PCに運べたら、ビルドPCの `C:\sbom-tools` と `C:\sbom-work` は削除して構いません。**ただし、リリースごとに作業1からやり直すので、残しておくと次回の準備が省けます。**
+
+## チェックリスト
+
+- [ ] 作業1：記録を取りながらビルドし、cpp\_deps 実行時に「注意:」が出ないことを確認した
+- [ ] 作業1：`deps.json` を作成した
+- [ ] `deps.json`、`source.tar.gz` を作業PCへ運んだ
+
+次は 3. 作業PCの準備 に進みます（準備済みなら 4. SBOM作成）。

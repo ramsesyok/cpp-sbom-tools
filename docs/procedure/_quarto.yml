@@ -1,0 +1,58 @@
+project:
+  type: book
+  output-dir: _book
+
+lang: ja
+number-sections: false
+
+book:
+  title: "C/C++プログラムのSBOM作成・脆弱性確認 手順書（OSS版）"
+  author: "Yasuhiro Yokobori"
+  date: 2026-10-31
+  output-file: sbom-procedure
+  chapters:
+    - index.qmd
+    - part: "ビルドPCの作業"
+      chapters:
+        - build-linux.qmd
+        - build-windows.qmd
+    - part: "作業PCの作業（Windows）"
+      chapters:
+        - work-setup.qmd
+        - work-sbom.qmd
+        - work-vuln.qmd
+    - part: "共通の作業"
+      chapters:
+        - common-operations.qmd
+    - part: "付録"
+      chapters:
+        - appendix-a.qmd
+        - appendix-b.qmd
+        - appendix-c.qmd
+        - appendix-d.qmd
+
+format:
+  html:
+    theme: cosmo
+    toc: true
+    code-copy: true
+  typst:
+    papersize: a4
+    toc: true
+    include-in-header:
+      text: |
+        #set text(font: ("BIZ UDPGothic", "Meiryo"))
+        #show raw: set text(font: ("Consolas", "BIZ UDGothic"))
+    # 章・節の番号は本文の見出しに書いてあるので、PDF では自動の番号を付けない
+    include-before-body:
+      text: |
+        #set heading(numbering: none)
+        #set par(first-line-indent: 0pt, spacing: 1em)
+        #set page(header: context {
+          let page-number = here().page()
+          let chapters = query(heading.where(level: 1))
+          if not chapters.any(c => c.location().page() == page-number) {
+            let before = query(heading.where(level: 1).before(here()))
+            if before.len() > 0 { align(right, text(size: 9pt, fill: gray, before.last().body)) }
+          }
+        })
