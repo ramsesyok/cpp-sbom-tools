@@ -18,12 +18,16 @@ const usage = `使い方:
 
 それぞれの指定項目は cpp_sbom ledger -h のように確認できます。`
 
+var version = "dev"
+
 func main() {
 	if len(os.Args) < 2 {
 		fmt.Fprintln(os.Stderr, usage)
 		os.Exit(2)
 	}
 	switch os.Args[1] {
+	case "--version", "version":
+		fmt.Println("cpp_sbom", version)
 	case "ledger":
 		os.Exit(makeledger.Run(os.Args[2:]))
 	case "check":

@@ -3,13 +3,20 @@
 package main
 
 import (
+	"fmt"
 	"os"
 
 	"cpp_deps/internal/collect"
 	"cpp_deps/internal/inventory"
 )
 
+var version = "dev"
+
 func main() {
+	if len(os.Args) == 2 && (os.Args[1] == "--version" || os.Args[1] == "version") {
+		fmt.Println("cpp_deps", version)
+		return
+	}
 	if len(os.Args) > 1 && os.Args[1] == "inventory" {
 		os.Exit(inventory.Run(os.Args[2:]))
 	}

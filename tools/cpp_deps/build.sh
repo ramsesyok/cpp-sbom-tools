@@ -5,6 +5,10 @@
 set -e
 cd "$(dirname "$0")"
 export CGO_ENABLED=0
+release_version=${RELEASE_VERSION:-dev}
+case "$release_version" in
+	*[!a-zA-Z0-9._-]*|'') echo "エラー: RELEASE_VERSION に使えない文字があります" >&2; exit 1 ;;
+esac
 mkdir -p dist
 rm -f dist/windows-system-inventory.ps1
 syft=${SYFT:-syft}
@@ -14,9 +18,9 @@ if ! "$syft" version >/dev/null 2>&1; then
 	exit 1
 fi
 for cmd in cpp_deps cpp_sbom; do
-	GOOS=linux   GOARCH=amd64 go build -trimpath -ldflags "-s -w" -o "dist/$cmd-linux-amd64" "./cmd/$cmd"
-	GOOS=linux   GOARCH=arm64 go build -trimpath -ldflags "-s -w" -o "dist/$cmd-linux-arm64" "./cmd/$cmd"
-	GOOS=windows GOARCH=amd64 go build -trimpath -ldflags "-s -w" -o "dist/$cmd-windows-amd64.exe" "./cmd/$cmd"
+	GOOS=linux   GOARCH=amd64 go build -trimpath -ldflags "-s -w -X main.version=$release_version" -o "dist/$cmd-linux-amd64" "./cmd/$cmd"
+	GOOS=linux   GOARCH=arm64 go build -trimpath -ldflags "-s -w -X main.version=$release_version" -o "dist/$cmd-linux-arm64" "./cmd/$cmd"
+	GOOS=windows GOARCH=amd64 go build -trimpath -ldflags "-s -w -X main.version=$release_version" -o "dist/$cmd-windows-amd64.exe" "./cmd/$cmd"
 done
 
 for cmd in cpp_deps cpp_sbom; do
