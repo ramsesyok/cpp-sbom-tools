@@ -114,8 +114,11 @@ EOF
 fi
 if [ -n "${SYFT:-}" ]; then
 	"$SYFT" scan dir:/ --select-catalogers "+dpkg-db-cataloger,+rpm-db-cataloger" -o cyclonedx-json="$WORK/env.json" >/dev/null 2>&1 || ng "Syft の実行"
-else
+elif [ -f "$REPO/testdata/linux-cmake/downstream/build-env.cdx.json.gz" ]; then
 	gzip -dc "$REPO/testdata/linux-cmake/downstream/build-env.cdx.json.gz" >"$WORK/env.json"
+else
+	echo "エラー: SYFT を指定してください（検証データ testdata は git に含めていません）" >&2
+	exit 2
 fi
 "$SBOM" ledger --deps "$WORK/cmake.json" --scan "$SCAN" --src "$P" --osenv "$WORK/env.json" --out "$WORK/台帳.xlsx" >"$WORK/ledger.txt" 2>&1 && ok "ledger の実行" || { ng "ledger の実行"; cat "$WORK/ledger.txt"; }
 expect "ledger の画面の結果" "$WORK/ledger.txt" '完了しました。'

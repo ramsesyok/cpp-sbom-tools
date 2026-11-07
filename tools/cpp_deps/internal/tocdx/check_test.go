@@ -119,6 +119,9 @@ func TestCheckCvebinRealOutput(t *testing.T) {
 		ledger.ColPURL: "pkg:deb/ubuntu/libssl3t64@3.0.13-0ubuntu3.16?arch=amd64&distro=ubuntu-24.04&upstream=openssl",
 	}
 	sample := filepath.Join("..", "..", "..", "..", "testdata", "linux-to-windows", "cvebin-parts.json")
+	if _, err := os.Stat(sample); err != nil {
+		t.Skip("検証データ（testdata/linux-to-windows）がないので飛ばします。git には含めていません")
+	}
 	rc, out := runCheck(t, "--ledger", writeLedger(t, os_), "--cvebin", sample)
 	if rc != 0 || !strings.Contains(out, "確認済み: openssl 3.0.13 → 2行目 libssl3t64") || strings.Contains(out, "CVEBINTOOL") {
 		t.Errorf("rc=%d out=%q", rc, out)

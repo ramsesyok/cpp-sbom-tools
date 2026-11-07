@@ -63,7 +63,7 @@ claude.ai での検討（2026-10-31〜11-07）から Claude Code に引き継い
 - `samples/` … 検証用サンプル。paho.mqtt.c 1.3.13 / paho.mqtt.cpp 1.2.0（Ubuntu 24.04 の apt）＋ nlohmann-json 3.11.3（third_party に単一ヘッダを同梱）
   - `mqtt-client-cmake`：CMake、動的リンク
   - `mqtt-client-make`：Make＋bear、paho.mqtt.c を静的リンク（`-Wl,-Bstatic -lpaho-mqtt3c`）
-- `testdata/` … 検証時の入力と出力（Ubuntu 24.04 上で取得。パスとパッケージ版は取得環境に依存）。`linux-to-windows/` は Linux の結果を Windows で処理した検証の入力で、`go test` が使う
+- `testdata/` … 検証時の入力と出力。**git には含めない**（`.gitignore`。取得した PC のパスが入るため）。ないときは、使う `go test` は飛ばし、`acceptance_ubuntu.sh` は `SYFT` の指定が必要（Ubuntu 24.04 上で取得。パスとパッケージ版は取得環境に依存）。`linux-to-windows/` は Linux の結果を Windows で処理した検証の入力で、`go test` が使う
 
 ## 検証環境の再現（Ubuntu 24.04）
 

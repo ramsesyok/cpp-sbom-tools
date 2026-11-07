@@ -12,10 +12,13 @@ import (
 
 // TestLinuxResultOnAnyOS は、Linux のビルドPCで作った deps.json と build-env.cdx.json、
 // Windows の作業PCの ScanCode で調べた scancode.json から、どの OS でも同じ台帳ができることを確かめる。
-// testdata/linux-to-windows の作り方は docs/ledger_spec.md の受け入れテストを参照。
+// testdata/linux-to-windows は git に含めず、ない場合は飛ばす。作り方は docs/ledger_spec.md の受け入れテストを参照。
 func TestLinuxResultOnAnyOS(t *testing.T) {
 	repo := filepath.Join("..", "..", "..", "..")
 	data := filepath.Join(repo, "testdata", "linux-to-windows")
+	if _, err := os.Stat(data); err != nil {
+		t.Skip("検証データ（testdata/linux-to-windows）がないので飛ばします。git には含めていません")
+	}
 	work := t.TempDir()
 
 	envPath := filepath.Join(work, "build-env.cdx.json")
