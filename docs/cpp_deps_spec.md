@@ -1,6 +1,6 @@
 # cpp_deps 仕様（旧 collect_cpp_deps）
 
-> **状態：実装済み（2026-11-07）。** 台帳側の仕様は [ledger_spec.md](ledger_spec.md) を参照。
+> **状態：実装済み（2026-11-07）。** 製品種別ごとの台帳・SBOMの範囲は [product_scope_spec.md](product_scope_spec.md) を参照。WindowsではPEのimport表に現れない、成果物フォルダ内のDLLも部品候補として記録する。
 
 ビルドPC（Python がない可能性がある）で実行し、ビルドで使った部品の調査結果を `deps.json` に書き出すツール。ビルドPCに持ち込むものを最小にするため、収集だけを行い、サブコマンドはない。人はこのファイルを開かない。別のPCで `cpp_sbom ledger` が読んで Excel の台帳にする。Windows 版の仕様は末尾の「Windows 版」を参照。
 

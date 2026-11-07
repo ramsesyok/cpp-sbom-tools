@@ -19,11 +19,13 @@ const (
 	KindBundled   = "同梱"
 	KindExternal  = "別途導入"
 	KindMicrosoft = "Microsoft"
+	KindSystemOS  = "納入OS"
+	KindInstalled = "導入済みソフト"
 	KindExcluded  = "対象外"
 )
 
 // Kinds は区分のプルダウンの選択肢。
-var Kinds = []string{KindOSPackage, KindBundled, KindExternal, KindMicrosoft, KindExcluded}
+var Kinds = []string{KindOSPackage, KindBundled, KindExternal, KindMicrosoft, KindSystemOS, KindInstalled, KindExcluded}
 
 // NoCPE は「調べても CPE がない」ことを表す、CPEベンダーの値。
 const NoCPE = "なし"
@@ -53,15 +55,17 @@ var ReferenceColumns = map[string]bool{ColLocation: true, ColHolders: true, ColH
 
 // required は区分ごとの必須の項目。CPE または PURL の条件は別に扱う。
 var required = map[string][]string{
-	KindOSPackage: {ColName, ColVersion, ColLicense},
+	KindOSPackage: {ColName, ColVersion},
 	KindBundled:   {ColName, ColVersion, ColLicense, ColChecker},
 	KindExternal:  {ColName, ColVersion, ColLicense, ColChecker},
 	KindMicrosoft: {ColName, ColVersion},
+	KindSystemOS:  {ColName, ColVersion},
+	KindInstalled: {ColName, ColVersion},
 	KindExcluded:  {ColChecker, ColNote},
 }
 
 // needsCPEOrPURL は脆弱性の照合に CPE か PURL が必要な区分。
-var needsCPEOrPURL = map[string]bool{KindBundled: true, KindExternal: true}
+var needsCPEOrPURL = map[string]bool{KindBundled: true, KindExternal: true, KindInstalled: true}
 
 // Row は台帳の1行。キーは列の見出し。
 type Row map[string]string

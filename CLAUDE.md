@@ -1,5 +1,7 @@
 # C/C++ SBOM・脆弱性確認ツールキット
 
+製品種別を「ソフトウェア製品」と「システム製品」に分けた現行手順は `docs/procedure/`、入力とSBOM範囲の仕様は `docs/product_scope_spec.md`。以下の検証履歴と旧方針には変更前の記述が含まれる。
+
 既存の C/C++ プログラム（conan / vcpkg 非対応）について、SBOM（CycloneDX）を作り、脆弱性を確認するための手順とツール一式。
 claude.ai での検討（2026-10-31〜11-07）から Claude Code に引き継いだもの。
 

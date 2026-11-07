@@ -16,6 +16,12 @@ const textNumFmt = 49
 // FindingColumns はシート「調査結果」の列。
 var FindingColumns = []string{"種類", "ファイル", "出どころ", "パッケージ／製品名", "バージョン", "PURL", "会社名", "著作権表示"}
 
+const (
+	ScopeSoftware = "software"
+	ScopeSystem   = "system"
+	SheetScope    = "作成条件"
+)
+
 // Column は列の見出しから Excel の列名（A, B, …）を返す。
 func Column(col string) string {
 	for i, c := range Columns {
@@ -69,12 +75,29 @@ func MissingFormulas() map[string]string {
 
 // Write は台帳の Excel を作る。path がすでにあるかどうかは呼び出し側で確かめる。
 func Write(path string, rows []Row, findings [][]string) error {
+	return WriteWithScope(path, ScopeSoftware, rows, findings)
+}
+
+// WriteWithScope は納入形態を台帳に記録する。check/convert はここを読み、別の形態として処理しない。
+func WriteWithScope(path, scope string, rows []Row, findings [][]string) error {
+	if scope != ScopeSoftware && scope != ScopeSystem {
+		return fmt.Errorf("製品種別が正しくありません: %s", scope)
+	}
 	f := excelize.NewFile()
 	defer f.Close()
 	if err := f.SetSheetName(f.GetSheetName(0), SheetLedger); err != nil {
 		return err
 	}
 	if _, err := f.NewSheet(SheetFindings); err != nil {
+		return err
+	}
+	if _, err := f.NewSheet(SheetScope); err != nil {
+		return err
+	}
+	if err := f.SetCellStr(SheetScope, "A1", "製品種別"); err != nil {
+		return err
+	}
+	if err := f.SetCellStr(SheetScope, "B1", scope); err != nil {
 		return err
 	}
 	if err := writeLedgerSheet(f, rows); err != nil {
@@ -87,12 +110,36 @@ func Write(path string, rows []Row, findings [][]string) error {
 	return f.SaveAs(path)
 }
 
+// ReadScope は新しい台帳の製品種別を読む。旧台帳は範囲が曖昧なので拒否する。
+func ReadScope(path string) (string, error) {
+	f, err := excelize.OpenFile(path)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+	if idx, err := f.GetSheetIndex(SheetScope); err != nil || idx < 0 {
+		return "", fmt.Errorf("シート「%s」がありません。製品種別を指定して台帳を作り直してください", SheetScope)
+	}
+	scope, err := f.GetCellValue(SheetScope, "B1")
+	if err != nil {
+		return "", err
+	}
+	if scope != ScopeSoftware && scope != ScopeSystem {
+		return "", fmt.Errorf("シート「%s」の製品種別が正しくありません: %s", SheetScope, scope)
+	}
+	return scope, nil
+}
+
 func writeLedgerSheet(f *excelize.File, rows []Row) error {
 	styles, err := newStyles(f)
 	if err != nil {
 		return err
 	}
 	last, _ := excelize.ColumnNumberToName(len(Columns))
+	formattedThrough := formatRows
+	if len(rows)+1000 > formattedThrough {
+		formattedThrough = len(rows) + 1000
+	}
 	widths := map[string]float64{
 		ColKind: 14, ColName: 24, ColVersion: 20, ColLicense: 28, ColVendor: 14, ColProduct: 16, ColPURL: 30,
 		ColChecker: 12, ColNote: 28, ColLocation: 36, ColHolders: 30, ColHints: 26, ColTodo: 60,
@@ -139,7 +186,7 @@ func writeLedgerSheet(f *excelize.File, rows []Row) error {
 	}
 	kind := Column(ColKind)
 	dv := excelize.NewDataValidation(true)
-	dv.Sqref = fmt.Sprintf("%s2:%s%d", kind, kind, formatRows)
+	dv.Sqref = fmt.Sprintf("%s2:%s%d", kind, kind, formattedThrough)
 	if err := dv.SetDropList(Kinds); err != nil {
 		return err
 	}
@@ -155,7 +202,7 @@ func writeLedgerSheet(f *excelize.File, rows []Row) error {
 		}
 		name := Column(col)
 		format := styles.missing
-		err := f.SetConditionalFormat(SheetLedger, fmt.Sprintf("%s2:%s%d", name, name, formatRows), []excelize.ConditionalFormatOptions{
+		err := f.SetConditionalFormat(SheetLedger, fmt.Sprintf("%s2:%s%d", name, name, formattedThrough), []excelize.ConditionalFormatOptions{
 			{Type: "formula", Criteria: formula, Format: &format},
 		})
 		if err != nil {

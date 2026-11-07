@@ -1,0 +1,74 @@
+# 6. システム製品のSBOMを作る
+
+この章は、ソフトウェアを入れたサーバまたはワークステーションを、OSごと納入する場合に使います。第1章または第2章でソフトウェアのビルドを記録し、第3章の準備と第4章の共通調査を終えてから実行します。**OSの情報はビルドPCではなく、完成した納入構成から取得します。**
+
+## 6.1 納入構成を記録する
+
+ソフトウェアの納入ファイルを `C:\sbom-work\delivery` に用意します（第5章5.1と同じ範囲）。さらに、完成した納入機器または納入イメージで、次のどちらかを行います。ツールは置いて実行するだけで、インストールしません。結果を社内規定に従って作業PCへ運びます。
+
+**Linuxの納入構成**：第1章で入手したポータブル版Syftの `.tar.gz` を、納入構成を確認する機器に置きます。実際の納入構成で次を実行します。ビルドPCで作った `build-env.cdx.json` を流用しないでください。
+
+```bash
+mkdir -p ~/sbom-tools/syft ~/sbom-work
+tar xzf syft_*_linux_amd64.tar.gz -C ~/sbom-tools/syft
+SYFT_CHECK_FOR_APP_UPDATE=false SYFT_FILE_METADATA_SELECTION=none \
+~/sbom-tools/syft/syft scan dir:/ \
+  --override-default-catalogers "dpkg-db-cataloger,rpm-db-cataloger" \
+  --exclude './proc/**' --exclude './sys/**' --exclude './dev/**' \
+  --exclude './home/**' --exclude './tmp/**' \
+  -o cyclonedx-json=$HOME/sbom-work/system-inventory.cdx.json
+```
+
+この結果はOSパッケージの台帳です。`/opt` やユーザー別の場所にパッケージ管理外で導入したソフトウェアがあれば、開発・構築担当者から納入構成の一覧を受け取り、後で台帳に行を追加してください。
+
+**Windowsの納入構成**：配布物の `windows-system-inventory.ps1` を納入機器へ置き、PowerShellで実行します。Windows標準の機能で、OSの版、機器全体にインストールされたアプリの登録情報、更新プログラムを記録します。
+
+```powershell
+powershell -NoProfile -File C:\sbom-tools\windows-system-inventory.ps1 `
+  -OutputDirectory C:\sbom-work
+```
+
+`system-inventory.cdx.json` と `windows-updates.csv` を作業PCへ運びます。このスクリプトはユーザー別に導入されたアプリ、ポータブルアプリ、ドライバ・ファームウェアを網羅しません。納入構成の一覧と突き合わせ、抜けたソフトウェアは台帳に追加してください。`windows-updates.csv` は `Get-HotFix` で見える更新だけの記録です。更新履歴の全件とは限らないため、納入構成の更新管理記録と合わせて脆弱性を判断します。
+
+## 6.2 部品台帳を作る
+
+Linux向けシステム製品の場合：
+
+```powershell
+cd C:\sbom-work
+cpp_sbom-windows-amd64.exe ledger --product system `
+  --deps deps.json --scan scancode.json --osenv build-env.cdx.json `
+  --src C:\sbom-work\<プロジェクトのフォルダ名> `
+  --delivery C:\sbom-work\delivery `
+  --system-inventory C:\sbom-work\system-inventory.cdx.json `
+  --out 部品台帳.xlsx
+```
+
+Windows向けシステム製品の場合：
+
+```powershell
+cd C:\sbom-work
+cpp_sbom-windows-amd64.exe ledger --product system `
+  --deps deps.json --scan scancode.json `
+  --src C:\sbom-work\<プロジェクトのフォルダ名> `
+  --delivery C:\sbom-work\delivery `
+  --system-inventory C:\sbom-work\system-inventory.cdx.json `
+  --out 部品台帳.xlsx
+```
+
+`--system-inventory` は必ず**納入構成**で作ったファイルを指定します。`build-env.cdx.json` はLinuxのビルド環境のライセンス確認にだけ使います。
+
+納入OSとそのパッケージ・アプリは台帳に入ります。ライセンスが調査結果にないOSパッケージは空欄のままで構いません。Windowsの登録済みアプリは会社名が台帳の参考列に入りますが、CPE/PURLは自動で付かないため、該当する行は照合識別子を調べて記入します。見つからなければ「なし」と記録し、脆弱性照合の対象外となることを判断記録に残します。製品本体が登録済みアプリとして出た行は、二重掲載しないよう区分を「対象外」にして理由を書きます。版が空の導入済みソフト、出どころが不明な部品、同梱ソースなどの色の付いたセルも確認してください。台帳を保存してExcelを閉じます。
+
+## 6.3 照合、変換、形式チェック
+
+```powershell
+cpp_sbom-windows-amd64.exe check --ledger C:\sbom-work\部品台帳.xlsx `
+  --cvebin C:\sbom-work\cvebin-parts.json
+cpp_sbom-windows-amd64.exe convert --ledger C:\sbom-work\部品台帳.xlsx `
+  --name <システム製品名> --version <納入構成の版> `
+  --out C:\sbom-work\product.cdx.json
+cyclonedx validate --input-file C:\sbom-work\product.cdx.json --fail-on-errors
+```
+
+台帳の「作成条件」シートに `system` と記録され、`check` と `convert` は納入OSが1行あることを確認します。形式チェックは脆弱性照合の可否を保証しません。完成したSBOMを第7章で照合します。WindowsのOSと更新プログラムについては、Grypeの結果だけで判断せず、納入機器の更新記録とMicrosoftの修正情報も確認してください。

@@ -46,7 +46,12 @@ func RunCheck(args []string) int {
 		fmt.Fprintf(os.Stderr, "エラー: %s を読めません: %v\n", *ledgerPath, err)
 		return 1
 	}
-	_, libraries, warnings, errs, excluded := inspect(rows, false)
+	scope, err := ledger.ReadScope(*ledgerPath)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "エラー: 製品種別を読めません: %v\n", err)
+		return 1
+	}
+	_, libraries, warnings, errs, excluded := inspect(rows, scope, false)
 	// 直す機会を1回で済ませるため、未完成のときも注意をあわせて出す。
 	for _, w := range warnings {
 		fmt.Println("注意: " + w)

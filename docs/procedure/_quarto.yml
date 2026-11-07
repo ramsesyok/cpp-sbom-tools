@@ -20,6 +20,8 @@ book:
       chapters:
         - work-setup.qmd
         - work-sbom.qmd
+        - software-product.qmd
+        - system-product.qmd
         - work-vuln.qmd
     - part: "共通の作業"
       chapters:

@@ -90,12 +90,19 @@ func TestCheckArguments(t *testing.T) {
 
 // 実際の Excel で保存した台帳でも、check と変換の判定が一致すること。
 func TestCheckAgreesWithConversion(t *testing.T) {
-	p := filepath.Join("testdata", "excel_saved.xlsx")
+	p := withScopeFixture(t, filepath.Join("testdata", "excel_saved.xlsx"))
 	if rc, out := runCheck(t, "--ledger", p); rc != 0 || !strings.Contains(out, "完成しています") {
 		t.Errorf("rc=%d out=%q", rc, out)
 	}
 	if rc := Run([]string{"--ledger", p, "--name", "a", "--version", "1", "--out", filepath.Join(t.TempDir(), "p.json")}); rc != 0 {
 		t.Errorf("変換の rc = %d", rc)
+	}
+}
+
+func TestLegacyLedgerRequiresProductType(t *testing.T) {
+	rc, out := runCheck(t, "--ledger", filepath.Join("testdata", "excel_saved.xlsx"))
+	if rc != 1 || !strings.Contains(out, "製品種別を指定して台帳を作り直して") {
+		t.Errorf("旧台帳: rc=%d out=%q", rc, out)
 	}
 }
 

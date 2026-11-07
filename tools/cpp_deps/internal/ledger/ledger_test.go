@@ -54,7 +54,7 @@ func TestMissing(t *testing.T) {
 		{"CPEなしと明記", with(KindBundled, Row{ColVendor: NoCPE, ColProduct: ""}), ""},
 		{"PURLのみ", with(KindExternal, Row{ColVendor: "", ColProduct: "", ColPURL: "pkg:x/y@1"}), ""},
 		{"OSはCPE不要", with(KindOSPackage, Row{ColVendor: "", ColProduct: "", ColChecker: ""}), ""},
-		{"OSのライセンスなし", with(KindOSPackage, Row{ColLicense: ""}), "ライセンスが未記入"},
+		{"OSのライセンスなし", with(KindOSPackage, Row{ColLicense: ""}), ""},
 		{"Microsoft", Row{ColKind: KindMicrosoft, ColName: "MSVC", ColVersion: "14"}, ""},
 		{"Microsoftの版なし", Row{ColKind: KindMicrosoft, ColName: "MSVC"}, "バージョンが未記入"},
 		{"対象外", Row{ColKind: KindExcluded, ColChecker: "x", ColNote: "自社"}, ""},
@@ -93,7 +93,7 @@ func TestWorkbookRoundTrip(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer f.Close()
-	if sheets := f.GetSheetList(); !reflect.DeepEqual(sheets, []string{SheetLedger, SheetFindings}) {
+	if sheets := f.GetSheetList(); !reflect.DeepEqual(sheets, []string{SheetLedger, SheetFindings, SheetScope}) {
 		t.Errorf("シート: %q", sheets)
 	}
 	// 数値ではなく文字列として保存されていること（1.10 が 1.1 にならない）

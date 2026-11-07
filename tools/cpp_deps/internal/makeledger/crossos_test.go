@@ -42,6 +42,8 @@ func TestLinuxResultOnAnyOS(t *testing.T) {
 
 	xlsx := filepath.Join(work, "部品台帳.xlsx")
 	code := Run([]string{
+		"--product", "software",
+		"--delivery", work,
 		"--deps", filepath.Join(data, "deps.json"),
 		"--scan", filepath.Join(data, "scancode.json"),
 		"--osenv", envPath,
@@ -55,22 +57,15 @@ func TestLinuxResultOnAnyOS(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(rows) != 15 {
-		t.Fatalf("行数 %d", len(rows))
+	if len(rows) == 0 {
+		t.Fatal("部品行がありません")
 	}
 	found := map[string]ledger.Row{}
-	packages := 0
 	for _, nr := range rows {
 		found[nr.Row.Get(ledger.ColLocation)] = nr.Row
 		if nr.Row.Get(ledger.ColKind) == ledger.KindOSPackage {
-			packages++
-			if nr.Row.Get(ledger.ColLicense) == "" {
-				t.Errorf("%s のライセンスが空", nr.Row.Get(ledger.ColName))
-			}
+			t.Errorf("ビルドPCのOSパッケージが製品行に入りました: %s", nr.Row.Get(ledger.ColName))
 		}
-	}
-	if packages != 13 {
-		t.Errorf("OSパッケージ %d 行", packages)
 	}
 	if _, ok := found["src"]; !ok {
 		t.Error("src の行がない")

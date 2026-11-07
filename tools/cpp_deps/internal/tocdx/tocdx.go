@@ -12,7 +12,6 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"sort"
 	"strings"
 	"time"
 
@@ -78,7 +77,7 @@ type merged struct {
 // convert は台帳の行を部品にする。止めるべき問題があれば errs に入れる。
 func convert(rows []ledger.NumberedRow, allowPending bool) (comps []component, warnings, errs []string, excluded int) {
 	var order []*merged
-	byKey := map[string]*merged{}
+	byKey := map[string][]*merged{}
 	for _, nr := range rows {
 		r := nr.Row
 		if missing := ledger.Missing(r); len(missing) > 0 {
@@ -95,11 +94,18 @@ func convert(rows []ledger.NumberedRow, allowPending bool) (comps []component, w
 			excluded++
 			continue
 		}
-		key := r.Get(ledger.ColName) + "\x00" + r.Get(ledger.ColVersion)
-		m := byKey[key]
+		key := r.Get(ledger.ColKind) + "\x00" + r.Get(ledger.ColName) + "\x00" + r.Get(ledger.ColVersion)
+		var m *merged
+		for _, candidate := range byKey[key] {
+			a, b := candidate.row.Get(ledger.ColPURL), r.Get(ledger.ColPURL)
+			if a == b || a == "" || b == "" {
+				m = candidate
+				break
+			}
+		}
 		if m == nil {
 			m = &merged{row: r, number: nr.Number}
-			byKey[key] = m
+			byKey[key] = append(byKey[key], m)
 			order = append(order, m)
 		} else {
 			name := r.Get(ledger.ColName)
@@ -107,9 +113,7 @@ func convert(rows []ledger.NumberedRow, allowPending bool) (comps []component, w
 			if a, b := cpeOf(m.row), cpeOf(r); a != b {
 				errs = append(errs, fmt.Sprintf("%d行目と%d行目: %s %s の CPE が食い違っています", m.number, nr.Number, name, ver))
 			}
-			if a, b := r.Get(ledger.ColPURL), m.row.Get(ledger.ColPURL); a != "" && b != "" && a != b {
-				warnings = append(warnings, fmt.Sprintf("%d行目: %s %s の PURL が%d行目と違います（%d行目のものを使いました）", nr.Number, name, ver, m.number, m.number))
-			} else if b == "" && a != "" {
+			if a, b := r.Get(ledger.ColPURL), m.row.Get(ledger.ColPURL); b == "" && a != "" {
 				m.row[ledger.ColPURL] = a
 			}
 		}
@@ -120,11 +124,20 @@ func convert(rows []ledger.NumberedRow, allowPending bool) (comps []component, w
 	for _, m := range order {
 		r := m.row
 		name, ver := r.Get(ledger.ColName), r.Get(ledger.ColVersion)
-		c := component{Type: "library", BomRef: name + "@" + ver, Name: name, Version: ver, CPE: cpeOf(r)}
-		c.PURL = r.Get(ledger.ColPURL)
-		if c.PURL == "" {
-			c.PURL = "pkg:generic/" + strings.ReplaceAll(name, " ", "%20") + "@" + ver
+		kind := r.Get(ledger.ColKind)
+		componentType := "library"
+		if kind == ledger.KindSystemOS {
+			componentType = "operating-system"
 		}
+		if kind == ledger.KindInstalled {
+			componentType = "application"
+		}
+		ref := "component:" + kind + ":" + name + "@" + ver
+		if purl := r.Get(ledger.ColPURL); purl != "" {
+			ref += ":" + purl
+		}
+		c := component{Type: componentType, BomRef: ref, Name: name, Version: ver, CPE: cpeOf(r)}
+		c.PURL = r.Get(ledger.ColPURL)
 		if lic := ledger.JoinLicenses(m.licenses); lic != "" {
 			c.Licenses = []license{{Expression: lic}}
 		}
@@ -133,7 +146,7 @@ func convert(rows []ledger.NumberedRow, allowPending bool) (comps []component, w
 				c.Properties = append(c.Properties, property{Name: "ledger:" + col, Value: v})
 			}
 		}
-		if c.CPE == "" && r.Get(ledger.ColPURL) == "" && r.Get(ledger.ColKind) != ledger.KindMicrosoft {
+		if c.CPE == "" && r.Get(ledger.ColPURL) == "" && kind != ledger.KindMicrosoft && kind != ledger.KindSystemOS {
 			warnings = append(warnings, fmt.Sprintf("%d行目: %s にCPEもPURLもありません。脆弱性の照合ができません", m.number, name))
 		}
 		comps = append(comps, c)
@@ -152,45 +165,22 @@ func cpeOf(r ledger.Row) string {
 	return buildCPE(r.Get(ledger.ColVendor), r.Get(ledger.ColProduct), r.Get(ledger.ColVersion))
 }
 
-var distroPattern = regexp.MustCompile(`[?&]distro=([^&]+)`)
-
-// addOS は OSパッケージの PURL の distro= から、OS を部品として先頭に加える。
-func addOS(comps []component) ([]component, string) {
-	distros := map[string]bool{}
-	for _, c := range comps {
-		if !strings.HasPrefix(c.PURL, "pkg:deb/") && !strings.HasPrefix(c.PURL, "pkg:rpm/") {
-			continue
-		}
-		if m := distroPattern.FindStringSubmatch(c.PURL); m != nil {
-			distros[m[1]] = true
-		}
-	}
-	switch len(distros) {
-	case 0:
-		return comps, ""
-	case 1:
-		for d := range distros {
-			name, ver, _ := strings.Cut(d, "-")
-			osComp := component{Type: "operating-system", BomRef: "os:" + d, Name: name, Version: ver}
-			return append([]component{osComp}, comps...), ""
-		}
-	}
-	names := make([]string, 0, len(distros))
-	for d := range distros {
-		names = append(names, d)
-	}
-	sort.Strings(names)
-	return comps, "OSパッケージのPURLに複数のOS（" + strings.Join(names, "、") + "）が混在しています。ビルド環境ごとに台帳を分けてください"
-}
-
 // inspect は台帳の行を調べ、SBOM に入れる部品と問題点を返す。変換と check の両方が使うので、判定は必ず一致する。
 // libraries は OS を除いた部品の数。
-func inspect(rows []ledger.NumberedRow, allowPending bool) (comps []component, libraries int, warnings, errs []string, excluded int) {
+func inspect(rows []ledger.NumberedRow, scope string, allowPending bool) (comps []component, libraries int, warnings, errs []string, excluded int) {
 	comps, warnings, errs, excluded = convert(rows, allowPending)
 	libraries = len(comps)
-	comps, osWarning := addOS(comps)
-	if osWarning != "" {
-		warnings = append(warnings, osWarning)
+	osCount := 0
+	for _, c := range comps {
+		if c.Type == "operating-system" {
+			osCount++
+		}
+	}
+	if scope == ledger.ScopeSystem && osCount != 1 {
+		errs = append(errs, fmt.Sprintf("システム製品には納入OSが1行必要です（現在 %d 行）", osCount))
+	}
+	if scope == ledger.ScopeSoftware && osCount != 0 {
+		errs = append(errs, "ソフトウェア製品に納入OSの行は入れられません")
 	}
 	return comps, libraries, warnings, errs, excluded
 }
@@ -240,7 +230,12 @@ func Run(args []string) int {
 		fmt.Fprintf(os.Stderr, "エラー: %s を読めません: %v\n", *ledgerPath, err)
 		return 1
 	}
-	comps, libraries, warnings, errs, excluded := inspect(rows, *allowPending)
+	scope, err := ledger.ReadScope(*ledgerPath)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "エラー: 製品種別を読めません: %v\n", err)
+		return 1
+	}
+	comps, libraries, warnings, errs, excluded := inspect(rows, scope, *allowPending)
 	if len(errs) > 0 {
 		fmt.Fprintln(os.Stderr, "エラー: 台帳に足りない項目があります。記入してから再実行してください")
 		for _, e := range errs {
@@ -254,7 +249,7 @@ func Run(args []string) int {
 		fmt.Fprintf(os.Stderr, "エラー: 識別子を作れません: %v\n", err)
 		return 1
 	}
-	self := *name + "@" + *version
+	self := "product:" + *name + "@" + *version
 	refs := make([]string, len(comps))
 	for i, c := range comps {
 		refs[i] = c.BomRef
@@ -301,11 +296,7 @@ func Run(args []string) int {
 	for _, w := range warnings {
 		fmt.Println("注意: " + w)
 	}
-	osNote := ""
-	if libraries != len(comps) {
-		osNote = "（OSの情報も追加）"
-	}
-	fmt.Printf("完了しました。部品 %d 件%sを %s に書き出しました。", libraries, osNote, *out)
+	fmt.Printf("完了しました。部品 %d 件を %s に書き出しました。", libraries, *out)
 	if excluded > 0 {
 		fmt.Printf("「対象外」の %d 行は入れていません。", excluded)
 	}

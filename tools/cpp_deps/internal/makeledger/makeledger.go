@@ -7,6 +7,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io/fs"
 	"os"
 	"path"
 	"path/filepath"
@@ -32,6 +33,9 @@ const (
 func Run(args []string) int {
 	fset := flag.NewFlagSet("cpp_sbom ledger", flag.ContinueOnError)
 	depsPath := fset.String("deps", "", "collect で作った deps.json（必須）")
+	product := fset.String("product", "", "製品種別: software または system（必須）")
+	delivery := fset.String("delivery", "", "実際に納入するファイルのフォルダ（必須）")
+	systemInventory := fset.String("system-inventory", "", "完成した納入構成の CycloneDX JSON（system では必須）")
 	scanPath := fset.String("scan", "", "ScanCode の --json-pp の結果（必須）")
 	src := fset.String("src", "", "ScanCode で調べたプロジェクトのフォルダ（必須。バージョン候補を読む）")
 	osenv := fset.String("osenv", "", "Syft で作った build-env.cdx.json（Linux では必須）")
@@ -46,9 +50,20 @@ func Run(args []string) int {
 		fmt.Fprintf(os.Stderr, "エラー: 不明な引数です: %s\n", strings.Join(fset.Args(), " "))
 		return 2
 	}
-	if *depsPath == "" || *scanPath == "" || *src == "" {
-		fmt.Fprintln(os.Stderr, "エラー: --deps、--scan、--src を指定してください")
+	if *depsPath == "" || *scanPath == "" || *src == "" || *delivery == "" || (*product != ledger.ScopeSoftware && *product != ledger.ScopeSystem) {
+		fmt.Fprintln(os.Stderr, "エラー: --product software|system、--delivery、--deps、--scan、--src を指定してください")
 		return 2
+	}
+	if *product == ledger.ScopeSystem && *systemInventory == "" {
+		fmt.Fprintln(os.Stderr, "エラー: システム製品には --system-inventory を指定してください")
+		return 2
+	}
+	if *product == ledger.ScopeSoftware && *systemInventory != "" {
+		fmt.Fprintln(os.Stderr, "エラー: --system-inventory はシステム製品だけに指定してください")
+		return 2
+	}
+	if st, err := os.Stat(*delivery); err != nil || !st.IsDir() {
+		return fail("納入ファイルのフォルダが見つかりません: %s", *delivery)
 	}
 	if _, err := os.Stat(*out); err == nil {
 		return fail("%s はすでにあります。記入した内容を守るため、上書きしません。作り直すときは、別の名前を --out に指定するか、古いファイルを移動してください", *out)
@@ -79,13 +94,28 @@ func Run(args []string) int {
 		fmt.Println("注意: " + w)
 	}
 
+	delivered := deliveryNames(*delivery)
+	if len(delivered) == 0 {
+		return fail("--delivery に納入ファイルがありません: %s", *delivery)
+	}
 	rows := buildRows(result, scan, *src, licenses)
+	rows = productRows(rows, result, delivered)
+	if *product == ledger.ScopeSystem {
+		installed, err := readSystemInventory(*systemInventory)
+		if err != nil {
+			return fail("%s を読めません: %v", *systemInventory, err)
+		}
+		rows = append(rows, installed...)
+	}
+	sort.SliceStable(rows, func(i, j int) bool {
+		return len(ledger.Missing(rows[i])) > 0 && len(ledger.Missing(rows[j])) == 0
+	})
 	if dir := filepath.Dir(*out); dir != "." {
 		if err := os.MkdirAll(dir, 0o755); err != nil {
 			return fail("出力先のフォルダを作れません: %v", err)
 		}
 	}
-	if err := ledger.Write(*out, rows, findings(result)); err != nil {
+	if err := ledger.WriteWithScope(*out, *product, rows, findings(result)); err != nil {
 		return fail("%s を書き込めません: %v", *out, err)
 	}
 	todo := 0
@@ -96,6 +126,68 @@ func Run(args []string) int {
 	}
 	fmt.Printf("完了しました。部品 %d 行を %s に書き出しました（記入が必要な行 %d 行）。\n", len(rows), *out, todo)
 	return 0
+}
+
+func deliveryNames(root string) map[string]bool {
+	names := map[string]bool{}
+	filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
+		if err == nil && !d.IsDir() {
+			names[strings.ToLower(d.Name())] = true
+		}
+		return nil
+	})
+	return names
+}
+
+// productRows はビルド環境の情報を納入物の部品と区別する。
+// ヘッダだけのパッケージはコードを取り込んだ可能性があるので人の確認へ回す。
+func productRows(rows []ledger.Row, r *deps.Result, delivered map[string]bool) []ledger.Row {
+	static, shipped := map[string]bool{}, map[string]bool{}
+	for _, f := range r.Files {
+		if f.Package == "" {
+			continue
+		}
+		if f.Kind == "静的ライブラリ" {
+			static[f.Package] = true
+		}
+		base := path.Base(strings.ReplaceAll(f.Path, `\`, "/"))
+		if delivered[strings.ToLower(base)] && f.Kind != "ヘッダ" {
+			shipped[f.Package] = true
+		}
+	}
+	var out []ledger.Row
+	for _, row := range rows {
+		location := strings.ToLower(path.Base(strings.ReplaceAll(row.Get(ledger.ColLocation), `\`, "/")))
+		if location != "" && !delivered[location] {
+			// 動的ライブラリは納入物にない限り実行環境側の要件として扱う。
+			if strings.Contains(location, ".so") || strings.HasSuffix(location, ".dll") {
+				continue
+			}
+		}
+		switch row.Get(ledger.ColKind) {
+		case ledger.KindMicrosoft:
+			continue // ビルド時のツールチェーン。納入側にあれば system-inventory から入る
+		case ledger.KindOSPackage:
+			var pkgName string
+			for _, p := range r.Packages {
+				if p.PURL == row.Get(ledger.ColPURL) {
+					pkgName = p.Name
+					break
+				}
+			}
+			if static[pkgName] || shipped[pkgName] {
+				row[ledger.ColKind] = ledger.KindBundled
+				row[ledger.ColTodo] = "納入物に取り込まれた部品。版とライセンスを確認"
+			} else if strings.Contains(row.Get(ledger.ColNote), "ヘッダのみ") {
+				row[ledger.ColKind] = ""
+				row[ledger.ColTodo] = "ヘッダのコードが製品に取り込まれたか確認。取り込まれたら同梱、そうでなければ対象外"
+			} else {
+				continue // 納入していない動的ライブラリ。調査結果には残す
+			}
+		}
+		out = append(out, row)
+	}
+	return out
 }
 
 func fail(format string, a ...any) int {

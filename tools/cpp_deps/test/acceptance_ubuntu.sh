@@ -120,9 +120,9 @@ else
 	echo "エラー: SYFT を指定してください（検証データ testdata は git に含めていません）" >&2
 	exit 2
 fi
-"$SBOM" ledger --deps "$WORK/cmake.json" --scan "$SCAN" --src "$P" --osenv "$WORK/env.json" --out "$WORK/台帳.xlsx" >"$WORK/ledger.txt" 2>&1 && ok "ledger の実行" || { ng "ledger の実行"; cat "$WORK/ledger.txt"; }
+"$SBOM" ledger --product software --delivery "$P/build" --deps "$WORK/cmake.json" --scan "$SCAN" --src "$P" --osenv "$WORK/env.json" --out "$WORK/台帳.xlsx" >"$WORK/ledger.txt" 2>&1 && ok "ledger の実行" || { ng "ledger の実行"; cat "$WORK/ledger.txt"; }
 expect "ledger の画面の結果" "$WORK/ledger.txt" '完了しました。'
-"$SBOM" ledger --deps "$WORK/cmake.json" --scan "$SCAN" --src "$P" --osenv "$WORK/env.json" --out "$WORK/台帳.xlsx" >"$WORK/ledger2.txt" 2>&1
+"$SBOM" ledger --product software --delivery "$P/build" --deps "$WORK/cmake.json" --scan "$SCAN" --src "$P" --osenv "$WORK/env.json" --out "$WORK/台帳.xlsx" >"$WORK/ledger2.txt" 2>&1
 [ $? = 1 ] && ok "既存の台帳は上書きしない" || ng "既存の台帳を上書きした"
 "$SBOM" convert --ledger "$WORK/台帳.xlsx" --name app --version 1.0 --out "$WORK/x.cdx.json" >"$WORK/cdx.txt" 2>&1
 [ $? = 1 ] && ok "未記入の台帳は変換しない" || ng "未記入の台帳を変換した"

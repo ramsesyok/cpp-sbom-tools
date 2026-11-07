@@ -215,7 +215,8 @@ func TestRun(t *testing.T) {
 	dir := t.TempDir()
 	depsPath := filepath.Join(dir, "deps.json")
 	if err := deps.Write(depsPath, &deps.Result{Platform: deps.PlatformLinux, Src: dir, Items: []deps.Item{folderItem("src")},
-		Warnings: []string{"テスト"}, Packages: []deps.Package{{Name: "libx:amd64", Version: "1"}}}); err != nil {
+		Warnings: []string{"テスト"}, Packages: []deps.Package{{Name: "libx:amd64", Version: "1", PURL: "pkg:deb/ubuntu/libx@1?distro=ubuntu-24.04"}},
+		Files: []deps.File{{Kind: "静的ライブラリ", Path: "/usr/lib/libx.a", Package: "libx:amd64"}}}); err != nil {
 		t.Fatal(err)
 	}
 	scan := filepath.Join(dir, "scan.json")
@@ -223,7 +224,7 @@ func TestRun(t *testing.T) {
 	osenv := filepath.Join(dir, "env.json")
 	os.WriteFile(osenv, []byte(`{"components":[{"name":"libx","licenses":[{"license":{"id":"MIT"}},{"license":{"name":"Foo"}},{"expression":"MIT"}]}]}`), 0o644)
 	out := filepath.Join(dir, "台帳.xlsx")
-	args := []string{"--deps", depsPath, "--scan", scan, "--src", dir, "--osenv", osenv, "--out", out}
+	args := []string{"--product", "software", "--delivery", dir, "--deps", depsPath, "--scan", scan, "--src", dir, "--osenv", osenv, "--out", out}
 
 	if rc := Run(args); rc != 0 {
 		t.Fatalf("rc = %d", rc)
@@ -238,17 +239,17 @@ func TestRun(t *testing.T) {
 	if rc := Run(args); rc != 1 {
 		t.Errorf("上書きできてしまいます: rc = %d", rc)
 	}
-	if rc := Run([]string{"--deps", depsPath, "--scan", scan, "--src", dir, "--out", filepath.Join(dir, "b.xlsx")}); rc != 2 {
+	if rc := Run([]string{"--product", "software", "--delivery", dir, "--deps", depsPath, "--scan", scan, "--src", dir, "--out", filepath.Join(dir, "b.xlsx")}); rc != 2 {
 		t.Errorf("--osenv なしの rc = %d", rc)
 	}
 	other := filepath.Join(dir, "other.json")
 	writeScan(t, other, []fakeFile{{Path: "else/a.h"}})
-	if rc := Run([]string{"--deps", depsPath, "--scan", other, "--src", dir, "--osenv", osenv, "--out", filepath.Join(dir, "c.xlsx")}); rc != 1 {
+	if rc := Run([]string{"--product", "software", "--delivery", dir, "--deps", depsPath, "--scan", other, "--src", dir, "--osenv", osenv, "--out", filepath.Join(dir, "c.xlsx")}); rc != 1 {
 		t.Errorf("違うフォルダを調べた結果の rc = %d", rc)
 	}
 	bad := filepath.Join(dir, "bad.json")
 	os.WriteFile(bad, []byte(`{"schema_version":99,"platform":"linux"}`), 0o644)
-	if rc := Run([]string{"--deps", bad, "--scan", scan, "--src", dir, "--osenv", osenv, "--out", filepath.Join(dir, "d.xlsx")}); rc != 1 {
+	if rc := Run([]string{"--product", "software", "--delivery", dir, "--deps", bad, "--scan", scan, "--src", dir, "--osenv", osenv, "--out", filepath.Join(dir, "d.xlsx")}); rc != 1 {
 		t.Errorf("知らない版の rc = %d", rc)
 	}
 }

@@ -5,9 +5,11 @@
 | ツール | 使う場所と作業 | 手順で使うファイル名 |
 | --- | --- | --- |
 | cpp\_deps | ビルドPC：作業1 | `cpp_deps-linux-amd64`（Linux）、`cpp_deps-windows-amd64.exe`（Windows） |
-| cpp\_sbom | 作業PC：作業5（`ledger` 台帳を作る、`check` 完成を確かめる、`convert` SBOMに変換する） | `cpp_sbom-windows-amd64.exe` |
+| cpp\_sbom | 作業PC：第5章または第6章（`ledger` 台帳を作る、`check` 完成を確かめる、`convert` SBOMに変換する） | `cpp_sbom-windows-amd64.exe` |
 
 本書の手順では作業PCを Windows としていますが、配布物には Linux 版の `cpp_sbom-linux-amd64` も含まれています。どちらのツールにも、aarch64 の Linux 向け（`-linux-arm64`）があります。
+
+システム製品がWindowsの場合は、配布物の `windows-system-inventory.ps1` を完成した納入構成で実行します。PowerShell標準機能だけを使い、インストールや外部通信はしません。
 
 ## cpp\_deps がしていること
 

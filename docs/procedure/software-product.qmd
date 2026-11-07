@@ -1,0 +1,52 @@
+# 5. ソフトウェア製品のSBOMを作る
+
+この章は、OSを含むサーバやワークステーションを納入せず、ソフトウェアだけを納入する場合に使います。第1章または第2章でビルドを記録し、第3章の準備と第4章の共通調査を終えてから実行します。**ビルドPCのOS全体は製品SBOMに入れません。**
+
+## 5.1 納入ファイルを確定する
+
+第4章で用意した `C:\sbom-work\delivery` に、顧客へ渡すファイルがそろっていることを確認します。Linuxの `.so` やWindowsのDLLを同梱する場合も、このフォルダに入れます。
+
+`deps.json` はビルドで使用したファイルの記録、`delivery` は納入するファイルの記録です。この二つの違いから、ビルドPCにだけある動的ライブラリを製品部品から外します。照合にはファイル名を使うため、同名で版が異なるファイルがある場合は台帳で実物を確認してください。**静的ライブラリと、ヘッダだけの部品は製品にコードが入る可能性があるため、台帳で確認します。**
+
+## 5.2 部品台帳を作る
+
+Linux向けソフトウェアの結果を処理する場合：
+
+```powershell
+cd C:\sbom-work
+cpp_sbom-windows-amd64.exe ledger --product software `
+  --deps deps.json --scan scancode.json --osenv build-env.cdx.json `
+  --src C:\sbom-work\<プロジェクトのフォルダ名> `
+  --delivery C:\sbom-work\delivery --out 部品台帳.xlsx
+```
+
+Windows向けソフトウェアの場合：
+
+```powershell
+cd C:\sbom-work
+cpp_sbom-windows-amd64.exe ledger --product software `
+  --deps deps.json --scan scancode.json `
+  --src C:\sbom-work\<プロジェクトのフォルダ名> `
+  --delivery C:\sbom-work\delivery --out 部品台帳.xlsx
+```
+
+`build-env.cdx.json` はLinuxのビルド環境のライセンス確認用で、納入OSの調査結果ではありません。
+
+台帳には納入物に含まれる候補と、判断が必要なヘッダ・自社ビルドのライブラリが出ます。区分が空の行を確認し、自社コードだけなら「対象外」、OSSのコードが製品に入るなら「同梱」にします。ビルド環境にしかない動的ライブラリは台帳に出ません。実行時に顧客側OSへ必要なライブラリは、製品の動作要件として別に記録してください。
+
+色の付いたセルの意味は付録Aを見てください。自動で入った名前、版、ライセンスも根拠が不明なら開発担当者に確認します。台帳を保存してExcelを閉じます。
+
+## 5.3 照合、変換、形式チェック
+
+```powershell
+cpp_sbom-windows-amd64.exe check --ledger C:\sbom-work\部品台帳.xlsx `
+  --cvebin C:\sbom-work\cvebin-parts.json
+cpp_sbom-windows-amd64.exe convert --ledger C:\sbom-work\部品台帳.xlsx `
+  --name <製品名> --version <製品のバージョン> `
+  --out C:\sbom-work\product.cdx.json
+cyclonedx validate --input-file C:\sbom-work\product.cdx.json --fail-on-errors
+```
+
+`check` の「要確認」は第4章のバイナリ調査と台帳が一致しないことを示します。実物を確認して、行の追加・修正、または誤検出の理由を記入してください。「CPEもPURLもありません」は脆弱性を照合できない可能性がある部品です。**形式チェックに合格しても、脆弱性をすべて照合できたとは限りません。**
+
+完成した `product.cdx.json` を第7章で照合します。リリースごとの保管物は第8章を見てください。

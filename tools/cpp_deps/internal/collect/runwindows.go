@@ -143,6 +143,15 @@ func runWindows(args []string) int {
 			}
 		}
 	}
+	// 実行時に明示ロードされるDLLはPEのimport表に現れない。成果物フォルダのDLLも候補にする。
+	for name, local := range localDLLs {
+		if seenDLL[name] {
+			continue
+		}
+		v := versions[local]
+		result.Items = append(result.Items, deps.Item{Reason: deps.ReasonBundledDLL, Kind: "同梱DLL", Path: local,
+			RelPath: windowsRel(srcFull, local), FileCount: 1, ProductName: v.productName, ProductVersion: v.productVersion})
+	}
 
 	var loadedDLLs []string
 	for key := range seenDLL {
